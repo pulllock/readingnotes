@@ -290,3 +290,75 @@ BeanWrapper相当于一个代理器，完成Bean属性的填充工作。
 * JBossAOP
 * Spring AOP
 
+
+# 创建增强类
+
+Spring使用增强类定义横切逻辑，增强既包括横切逻辑，还包含部分连接点的信息。
+
+## 增强类型
+
+* 前置增强：BeforeAdvice，表示在目标方法执行之前实施增强
+* 后置增强：AfterAdvice，表示在目标方法执行之后实施增强
+* 环绕增强：MethodInterceptor，表示在目标方法执行前后实施增强
+* 异常抛出增强：ThrowsAdvice，表示在目标方法抛出异常后实施增强
+* 引介增强：IntroductionInterceptor，表示在目标类中添加一些新的方法和属性。
+
+### 前置增强
+
+BeforeAdvice 前置增强接口，MethodBeforeAdvice接口是其子类。
+
+MethodBeforeAdvice中定义了唯一方法：before(Method method,Object[] args,Object obj) throws Throwable，method为目标类的方法，args为目标类的入参，obj为目标类实例。
+
+#### ProxyFactory
+内部使用JDK或者CGLib代理技术。
+
+可以通过使用Pro需要Factory的 setOptimize(true)方法，让ProxyFactory启动优化代理方式。
+
+### 后置增强
+
+在目标类方法调用后执行。
+
+### 环绕增强
+
+允许在目标里方法调用前后织入横切逻辑。
+
+### 异常抛出增强
+
+异常抛出增强最合适的应用场景是事务管理。
+
+### 引介增强
+为目标类创建新的方法和属性，引介增强的连接点是类级别的，不是方法级别的。
+
+# 创建切面
+
+增强提供了连接点方位信息，如织入到方法前面、后面等，而切点进一步描述织入到哪些类的哪些方法上。
+
+Pointcut描述切点。
+
+## 切点类型
+
+* 静态方法切点
+* 动态方法切点
+* 注解切点
+* 表达式切点
+* 流程切点
+* 复合切点
+
+## 切面类型
+
+Advisor接口表示切面的概念，一个切面同时包含横切代码和连接点信息。
+
+* Advisor 一般切面，仅包含一个Advice，Advice包含了横切代码和连接点信息，所以Advice本身就是一个简单的切面。横切面太宽泛，一般不直接使用。
+* PointcutAdvisor 切点切面，包含Advice和Pointcut两个里，可以通过类，方法名以及方法方位等信息灵活定义切面的连接点。
+* INtroductionAdvisor 引介切面，对应引介增强的特殊切面，应用在类层面上。
+
+
+# 自动创建代理
+
+# 基于@AspectJ和Schema的AOP
+
+# LTW
+
+
+
+
