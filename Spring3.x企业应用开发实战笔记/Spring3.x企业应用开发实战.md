@@ -359,6 +359,79 @@ Advisor接口表示切面的概念，一个切面同时包含横切代码和连�
 
 # LTW
 
+# Spring 对DAO的支持
+
+## 统一的异常体系
+
+### Spring的DAO异常体系
+Spring的异常体系都是建立在运行期异常的基础上。 
+
+# Spring的事务管理
+
+## 数据库事务
+
+### 数据并发问题
+
+* 脏读
+* 不可重复读
+* 幻象读
+* 第一类丢失更新和第二类丢失更新
+
+### 数据库锁机制
+
+表锁定和行锁定
+
+共享锁定和独占锁定
+
+### 事务隔离级别
+
+read uncommited
+
+read commited
+
+repeatable read
+
+serializable
+
+### ThreadLocal
+
+ThreadLocal是线程的一个本地化对象，当工作于多线程中的对象使用ThreadLocal维护变量时，ThreadLocal为每个使用该变量的线程分配一个独立的变量副本。
+
+
+### Sprig JDBC 和iBatis
+它们都是基于数据源的Connection访问数据库，所以可以使用DataSourceTransactionManager。
+
+### JPA
+
+JPA通过EntityTransaction管理JPA事务。
+
+底层JPA依然通过JDBC的Connection的事务方法完成最终控制，因此要配置一个JPA事务管理器，必须现提供一个DataSource，然后配置一个EntityManagerFactory，最后配置JpaTransactionManager。
+
+### Hibernate
+
+Hibernate使用Session封装Connection，所以需要一个能创建session的SessionFactory。
+
+### JTA
+
+JtaTrancactionmanager不需要知道DataSource和其他的特定资源，因为它引用容器提供的全局事务管理。
+
+### 事务同步管理器
+
+### 事务传播行为
+
+PROPAGATION_REQUIRED 如果当前没有事务，就新建一个事务，如果已经存在一个事务中，加入到这个事务中，这是最常见的选择。
+
+PROPAGATION_SUPPORTS 支持当前事务，如果当前没有事务，就以非事务方式执行。
+
+PROPAGATION_MANDATORY 使用当前事务，如果当前没有事务，就抛出异常。
+
+PROPAGATION_REQUIRES_NEW 新建事务，如当前存在事务，把当前事务挂起。
+
+PROPAGATION_NOT_SUPPORTED 以非事务方式执行，如果当前存在事务，酒吧当前事务挂起。
+
+PROPAGATION_NEVER 以非事务当时执行，如果当前存在事务，就抛出异常。
+
+PROPAGATION_NESTED 如果当前存在事务，则嵌套事务内执行，如果当前没有事务，则执行与PROPAGATION_REQUIERED类似的操作。
 
 
 
