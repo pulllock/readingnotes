@@ -433,5 +433,29 @@ PROPAGATION_NEVER 以非事务当时执行，如果当前存在事务，就抛�
 
 PROPAGATION_NESTED 如果当前存在事务，则嵌套事务内执行，如果当前没有事务，则执行与PROPAGATION_REQUIERED类似的操作。
 
+# 任务调度和异步执行器
+
+## Quartz
+
+* Job 实现该接口定义需要执行的任务。
+* JobDetail 
+* Trigger 描述触发Job执行的时间触发规则。
+* Calendar 一些日历特定时间点的集合。
+* Scheduler 代表一个Quartz的独立运行容器。
+* ThreadPool Scheduler使用一个线程池作为任务运行的基础设施，任务通过共享线程池中的线程提高运行效率。
+
+Quartz可以通过两种方式实现集群，一种是中间数据库，另一种是通过Teracotta进行集群。
+
+
+# Spring MVC
+
+1. Http请求，web应用服务器收到请求，如果匹配DispatcherServlet的请求映射路径（web.xml中指定），该请求转交给DispatcherServlet处理。
+2. DispatcherServlet收到请求，根据请求信息及HandlerMapping的配置找到处理请求的处理器Handler。可将HandlerMapping看成路由控制器，将Handler看成目标主机。
+3. 当DispatcherServlet根据HandlerMapping得到对应当前请求的Handler后，通过HandlerAdapter对Handler进行封装，再以统一的适配器接口调用Handler。
+4. 处理器完成业务逻辑的处理后，返回一个ModelAndView给DispatcherServlet，ModelAndView包含了试图逻辑名和模型数据信息。
+5. ModelAndView包含的是逻辑视图名，非真正视图对象，DispatcherServlet用ViewResolver完成逻辑视图名到真实视图对象的解析工作。
+6. 当得到真实视图对象View后，DispatcherServlet就使用这个View对象对ModelAndView中的模型数据进行视图渲染。
+7. 最终客户端得到相应信息，html，xml，json等等。
+
 
 
