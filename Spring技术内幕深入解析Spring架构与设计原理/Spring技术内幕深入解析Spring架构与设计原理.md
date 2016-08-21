@@ -1,0 +1,24 @@
+# Sprig IOC容器的设计
+
+![](IOCContainer.png)
+
+* 从接口BeanFactory到HierarchicalBeanFactory，再到ConfigurableBeanFactory是一条主要的BeanFactory设计路径。BeanFactory接口定义了基本的IOC容器规范。HierarchicalBeanFactory接口继承了BeanFactory，增加了getParentBeanFactory，使得BeanFactory具备了双亲IOC容器的管理功能。ConfigurableBeanFactory接口主要定义了一些对BeanFactory的配置功能。
+* 第二条主线以ApplicationContext应用上下文接口为核心，从BeanFactory到ListableBeanFactory，再到ApplicationContext再到WebApplicationContext或者ConfigurableApplicationContext接口。ListableBeanFactory和HierarchicalBeanFactory连接BeanFactory接口定义和ApplicationContext的接口功能。ApplicationContext通过集成MessageSource，ResourceLoader，ApplicationEventPublisher接口，在IOC容器的基础上添加了许多对高级容器的特性支持。
+* 这里设计的是主要的接口关系，具体IOC容器是在这些接口下实现的，DefaultLisableBeanFactory实现了ConfigurableBeanFactory，成为一个简单的IOC实现。XMLBeanFactory都是在DefaultListableBeanFactory的基础上做扩展。
+* 这个接口体系是一BeanFactory和ApplicationContext为核心。BeanFactory是IOC容器最基本的接口。web环境中设计了WebApplicationContext接口。
+
+# BeanFactory
+接口定义了IOC容器最基本的形式，提供了IOC容器所应遵守的最基本的服务契约。
+
+getBean方法是主要方法，可以取得IOC容器中管理的Bean。
+
+# ApplicationContext
+高级形态意义的IOC容器，在BeanFactory基础上添加附加功能。
+
+# IOC容器的初始化过程
+
+* Resource定位
+* BeanDefinition载入
+* 向IOC容器注册BeanDefinition
+
+## BeanDefinition的Resource定位
