@@ -684,6 +684,7 @@ public void parseMetaElements(Element ele, BeanMetadataAttributeAccessor attribu
 	}
 }
 ```
+<<<<<<< HEAD
 
 ## 解析子元素lookup-method
 获取器注入，把一个方法声明为返回某种类型的bean，但实际要返回的bean在配置文件里配置。
