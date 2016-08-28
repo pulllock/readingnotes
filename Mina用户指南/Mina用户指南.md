@@ -48,6 +48,8 @@ NIO Java1.4引入，Nina基于NIO 1，Java7 设计了新的NIO 2.
 
 是一个接口，服务端实现为IoAcceptor，客户端为IoConnector
 
+> 源码版本2.0.13
+
 ```
 public interface IoService {
 	//获取连接通信的元数据
@@ -146,10 +148,11 @@ public abstract class AbstractIoService implements IoService {
 
     //新创建的session使用的默认的session配置
     protected final IoSessionConfig sessionConfig;
-
+	
+	//服务监听器，服务激活时做了一些统计，其他的方法都是空的实现
     private final IoServiceListener serviceActivationListener = new IoServiceListener() {
         public void serviceActivated(IoService service) {
-            // Update lastIoTime.
+            
             AbstractIoService s = (AbstractIoService) service;
             IoServiceStatistics _stats = s.getStatistics();
             _stats.setLastReadTime(s.getActivationTime());
@@ -158,66 +161,37 @@ public abstract class AbstractIoService implements IoService {
 
         }
 
-        public void serviceDeactivated(IoService service) throws Exception {
-            // Empty handler
-        }
+        public void serviceDeactivated(IoService service) throws Exception {}
 
-        public void serviceIdle(IoService service, IdleStatus idleStatus) throws Exception {
-            // Empty handler
-        }
+        public void serviceIdle(IoService service, IdleStatus idleStatus) throws Exception {}
 
-        public void sessionCreated(IoSession session) throws Exception {
-            // Empty handler
-        }
+        public void sessionCreated(IoSession session) throws Exception {}
 
-        public void sessionClosed(IoSession session) throws Exception {
-            // Empty handler
-        }
+        public void sessionClosed(IoSession session) throws Exception {}
 
-        public void sessionDestroyed(IoSession session) throws Exception {
-            // Empty handler
-        }
+        public void sessionDestroyed(IoSession session) throws Exception {}
     };
 
-    /**
-     * Current filter chain builder.
-     */
+    //默认过滤器链builder
     private IoFilterChainBuilder filterChainBuilder = new DefaultIoFilterChainBuilder();
-
+	//默认session属性数据结构工厂
     private IoSessionDataStructureFactory sessionDataStructureFactory = new DefaultIoSessionDataStructureFactory();
 
-    /**
-     * Maintains the {@link IoServiceListener}s of this service.
-     */
+     //保存当前服务的监听器
     private final IoServiceListenerSupport listeners;
 
-    /**
-     * A lock object which must be acquired when related resources are
-     * destroyed.
-     */
+     //服务销毁时的锁
     protected final Object disposalLock = new Object();
-
+    
+	//正在销毁标志
     private volatile boolean disposing;
-
+	//已经销毁标志
     private volatile boolean disposed;
-
-    /**
-     * {@inheritDoc}
-     */
+	
+	//统计
     private IoServiceStatistics stats = new IoServiceStatistics(this);
 
-    /**
-     * Constructor for {@link AbstractIoService}. You need to provide a default
-     * session configuration and an {@link Executor} for handling I/O events. If
-     * a null {@link Executor} is provided, a default one will be created using
-     * {@link Executors#newCachedThreadPool()}.
-     * 
-     * @param sessionConfig
-     *            the default configuration for the managed {@link IoSession}
-     * @param executor
-     *            the {@link Executor} used for handling execution of I/O
-     *            events. Can be <code>null</code>.
-     */
+    //构造函数，需要提供默认session配置和executor，如果executor为空，默认使用Executors的newCachedThreadPool()
     protected AbstractIoService(IoSessionConfig sessionConfig, Executor executor) {
         if (sessionConfig == null) {
             throw new IllegalArgumentException("sessionConfig");
@@ -232,12 +206,11 @@ public abstract class AbstractIoService implements IoService {
                     + getTransportMetadata().getSessionConfigType() + ")");
         }
 
-        // Create the listeners, and add a first listener : a activation listener
-        // for this service, which will give information on the service state.
+        //创建监听器，并添加激活监听器
         listeners = new IoServiceListenerSupport(this);
         listeners.add(serviceActivationListener);
 
-        // Stores the given session configuration
+        //默认session配置
         this.sessionConfig = sessionConfig;
 
         // Make JVM load the exception monitor before some transports
@@ -255,16 +228,10 @@ public abstract class AbstractIoService implements IoService {
         threadName = getClass().getSimpleName() + '-' + id.incrementAndGet();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public final IoFilterChainBuilder getFilterChainBuilder() {
         return filterChainBuilder;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public final void setFilterChainBuilder(IoFilterChainBuilder builder) {
         if (builder == null) {
             builder = new DefaultIoFilterChainBuilder();
@@ -272,9 +239,6 @@ public abstract class AbstractIoService implements IoService {
         filterChainBuilder = builder;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public final DefaultIoFilterChainBuilder getFilterChain() {
         if (filterChainBuilder instanceof DefaultIoFilterChainBuilder) {
             return (DefaultIoFilterChainBuilder) filterChainBuilder;
@@ -283,119 +247,84 @@ public abstract class AbstractIoService implements IoService {
         throw new IllegalStateException("Current filter chain builder is not a DefaultIoFilterChainBuilder.");
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public final void addListener(IoServiceListener listener) {
         listeners.add(listener);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public final void removeListener(IoServiceListener listener) {
         listeners.remove(listener);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public final boolean isActive() {
         return listeners.isActive();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public final boolean isDisposing() {
         return disposing;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+
     public final boolean isDisposed() {
         return disposed;
     }
 
-    /**
-     * {@inheritDoc}
-     */
+	//停止服务，服务只能在所有等待中的session都被处理后才能停止
     public final void dispose() {
         dispose(false);
     }
-
-    /**
-     * {@inheritDoc}
-     */
+	//参数为true的话，等待每一个执行中的线程正常结束
     public final void dispose(boolean awaitTermination) {
+    	//已停止，返回
         if (disposed) {
             return;
         }
-
+		//销毁时，使用锁定
         synchronized (disposalLock) {
             if (!disposing) {
                 disposing = true;
 
                 try {
+                		//调用真正停止的方法，空方法，留给子类实现
                     dispose0();
                 } catch (Exception e) {
                     ExceptionMonitor.getInstance().exceptionCaught(e);
                 }
             }
         }
-
+		
+		//如果是当前服务创建的Executor，调用ExecutorService的关闭方法
         if (createdExecutor) {
             ExecutorService e = (ExecutorService) executor;
             e.shutdownNow();
+            //需要等待线程正常结束
             if (awaitTermination) {
 
                 try {
-                    LOGGER.debug("awaitTermination on {} called by thread=[{}]", this, Thread.currentThread().getName());
                     e.awaitTermination(Integer.MAX_VALUE, TimeUnit.SECONDS);
-                    LOGGER.debug("awaitTermination on {} finished", this);
                 } catch (InterruptedException e1) {
-                    LOGGER.warn("awaitTermination on [{}] was interrupted", this);
                     // Restore the interrupted status
                     Thread.currentThread().interrupt();
                 }
             }
         }
+        //设置已被销毁标志
         disposed = true;
     }
 
-    /**
-     * Implement this method to release any acquired resources.  This method
-     * is invoked only once by {@link #dispose()}.
-     * 
-     * @throws Exception If the dispose failed
-     */
     protected abstract void dispose0() throws Exception;
 
-    /**
-     * {@inheritDoc}
-     */
     public final Map<Long, IoSession> getManagedSessions() {
         return listeners.getManagedSessions();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public final int getManagedSessionCount() {
         return listeners.getManagedSessionCount();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public final IoHandler getHandler() {
         return handler;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public final void setHandler(IoHandler handler) {
         if (handler == null) {
             throw new IllegalArgumentException("handler cannot be null");
@@ -408,16 +337,10 @@ public abstract class AbstractIoService implements IoService {
         this.handler = handler;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public final IoSessionDataStructureFactory getSessionDataStructureFactory() {
         return sessionDataStructureFactory;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public final void setSessionDataStructureFactory(IoSessionDataStructureFactory sessionDataStructureFactory) {
         if (sessionDataStructureFactory == null) {
             throw new IllegalArgumentException("sessionDataStructureFactory");
@@ -430,16 +353,10 @@ public abstract class AbstractIoService implements IoService {
         this.sessionDataStructureFactory = sessionDataStructureFactory;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public IoServiceStatistics getStatistics() {
         return stats;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public final long getActivationTime() {
         return listeners.getActivationTime();
     }
@@ -448,9 +365,7 @@ public abstract class AbstractIoService implements IoService {
      * {@inheritDoc}
      */
     public final Set<WriteFuture> broadcast(Object message) {
-        // Convert to Set.  We do not return a List here because only the
-        // direct caller of MessageBroadcaster knows the order of write
-        // operations.
+		//IoUtil的广播方法
         final List<WriteFuture> futures = IoUtil.broadcast(message, getManagedSessions().values());
         return new AbstractSet<WriteFuture>() {
             @Override
@@ -481,8 +396,6 @@ public abstract class AbstractIoService implements IoService {
         executor.execute(new NamePreservingRunnable(worker, actualThreadName));
     }
 
-    // TODO Figure out make it work without causing a compiler error / warning.
-    @SuppressWarnings("unchecked")
     protected final void initSession(IoSession session, IoFuture future, IoSessionInitializer sessionInitializer) {
         // Update lastIoTime if needed.
         if (stats.getLastReadTime() == 0) {
@@ -491,12 +404,7 @@ public abstract class AbstractIoService implements IoService {
 
         if (stats.getLastWriteTime() == 0) {
             stats.setLastWriteTime(getActivationTime());
-        }
-
-        // Every property but attributeMap should be set now.
-        // Now initialize the attributeMap.  The reason why we initialize
-        // the attributeMap at last is to make sure all session properties
-        // such as remoteAddress are provided to IoSessionDataStructureFactory.
+        }      
         try {
             ((AbstractIoSession) session).setAttributeMap(session.getService().getSessionDataStructureFactory()
                     .getAttributeMap(session));
@@ -523,29 +431,14 @@ public abstract class AbstractIoService implements IoService {
         if (sessionInitializer != null) {
             sessionInitializer.initializeSession(session, future);
         }
-
+		//session初始化结束时调用，空实现，留给子类实现
         finishSessionInitialization0(session, future);
     }
 
-    /**
-     * Implement this method to perform additional tasks required for session
-     * initialization. Do not call this method directly;
-     * {@link #initSession(IoSession, IoFuture, IoSessionInitializer)} will call
-     * this method instead.
-     * 
-     * @param session The session to initialize
-     * @param future The Future to use
-     * 
-     */
     protected void finishSessionInitialization0(IoSession session, IoFuture future) {
-        // Do nothing. Extended class might add some specific code
+
     }
 
-    /**
-     * A specific class used to 
-     * @author elecharny
-     *
-     */
     protected static class ServiceOperationFuture extends DefaultIoFuture {
         public ServiceOperationFuture() {
             super(null);
@@ -576,16 +469,10 @@ public abstract class AbstractIoService implements IoService {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public int getScheduledWriteBytes() {
         return stats.getScheduledWriteBytes();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public int getScheduledWriteMessages() {
         return stats.getScheduledWriteMessages();
     }
@@ -646,6 +533,1047 @@ public interface IoAcceptor extends IoService {
 }
 ```
 
+### AbstractIoAcceptor
+
+AbstractIoAcceptor是一个抽象类，对IoAcceptor做一些基本实现，继承自 AbstractIoService 实现 IoAcceptor。
+
+```
+public abstract class AbstractIoAcceptor extends AbstractIoService implements IoAcceptor {
+	//默认本机地址列表
+    private final List<SocketAddress> defaultLocalAddresses = new ArrayList<SocketAddress>();
+	//不可修改的地址列表
+    private final List<SocketAddress> unmodifiableDefaultLocalAddresses = Collections
+            .unmodifiableList(defaultLocalAddresses);
+	//绑定地址
+    private final Set<SocketAddress> boundAddresses = new HashSet<SocketAddress>();
+	//解除绑定断开连接标志
+    private boolean disconnectOnUnbind = true;
+
+    //绑定锁，绑定或者解绑的时候使用此锁
+    protected final Object bindLock = new Object();
+
+    //默认构造，跟AbstractIoService一样
+    protected AbstractIoAcceptor(IoSessionConfig sessionConfig, Executor executor) {
+        super(sessionConfig, executor);
+        defaultLocalAddresses.add(null);
+    }
+
+    public SocketAddress getLocalAddress() {
+        Set<SocketAddress> localAddresses = getLocalAddresses();
+        if (localAddresses.isEmpty()) {
+            return null;
+        }
+
+        return localAddresses.iterator().next();
+    }
+
+    public final Set<SocketAddress> getLocalAddresses() {
+        Set<SocketAddress> localAddresses = new HashSet<SocketAddress>();
+
+        synchronized (boundAddresses) {
+            localAddresses.addAll(boundAddresses);
+        }
+
+        return localAddresses;
+    }
+
+    public SocketAddress getDefaultLocalAddress() {
+        if (defaultLocalAddresses.isEmpty()) {
+            return null;
+        }
+        return defaultLocalAddresses.iterator().next();
+    }
+
+    public final void setDefaultLocalAddress(SocketAddress localAddress) {
+        setDefaultLocalAddresses(localAddress);
+    }
+
+    public final List<SocketAddress> getDefaultLocalAddresses() {
+        return unmodifiableDefaultLocalAddresses;
+    }
+
+    public final void setDefaultLocalAddresses(List<? extends SocketAddress> localAddresses) {
+        if (localAddresses == null) {
+            throw new IllegalArgumentException("localAddresses");
+        }
+        setDefaultLocalAddresses((Iterable<? extends SocketAddress>) localAddresses);
+    }
+
+
+    public final void setDefaultLocalAddresses(Iterable<? extends SocketAddress> localAddresses) {
+        if (localAddresses == null) {
+            throw new IllegalArgumentException("localAddresses");
+        }
+
+        synchronized (bindLock) {
+            synchronized (boundAddresses) {
+                if (!boundAddresses.isEmpty()) {
+                    throw new IllegalStateException("localAddress can't be set while the acceptor is bound.");
+                }
+
+                Collection<SocketAddress> newLocalAddresses = new ArrayList<SocketAddress>();
+
+                for (SocketAddress a : localAddresses) {
+                    //检查地址类型
+                    checkAddressType(a);
+                    newLocalAddresses.add(a);
+                }
+
+                if (newLocalAddresses.isEmpty()) {
+                    throw new IllegalArgumentException("empty localAddresses");
+                }
+
+                this.defaultLocalAddresses.clear();
+                this.defaultLocalAddresses.addAll(newLocalAddresses);
+            }
+        }
+    }
+
+    public final void setDefaultLocalAddresses(SocketAddress firstLocalAddress, SocketAddress... otherLocalAddresses) {
+        if (otherLocalAddresses == null) {
+            otherLocalAddresses = new SocketAddress[0];
+        }
+
+        Collection<SocketAddress> newLocalAddresses = new ArrayList<SocketAddress>(otherLocalAddresses.length + 1);
+
+        newLocalAddresses.add(firstLocalAddress);
+        for (SocketAddress a : otherLocalAddresses) {
+            newLocalAddresses.add(a);
+        }
+
+        setDefaultLocalAddresses(newLocalAddresses);
+    }
+
+    public final boolean isCloseOnDeactivation() {
+        return disconnectOnUnbind;
+    }
+
+    public final void setCloseOnDeactivation(boolean disconnectClientsOnUnbind) {
+        this.disconnectOnUnbind = disconnectClientsOnUnbind;
+    }
+
+    public final void bind() throws IOException {
+        bind(getDefaultLocalAddresses());
+    }
+
+
+    public final void bind(SocketAddress localAddress) throws IOException {
+        if (localAddress == null) {
+            throw new IllegalArgumentException("localAddress");
+        }
+
+        List<SocketAddress> localAddresses = new ArrayList<SocketAddress>(1);
+        localAddresses.add(localAddress);
+        bind(localAddresses);
+    }
+
+    public final void bind(SocketAddress... addresses) throws IOException {
+        if ((addresses == null) || (addresses.length == 0)) {
+            bind(getDefaultLocalAddresses());
+            return;
+        }
+
+        List<SocketAddress> localAddresses = new ArrayList<SocketAddress>(2);
+
+        for (SocketAddress address : addresses) {
+            localAddresses.add(address);
+        }
+
+        bind(localAddresses);
+    }
+
+    public final void bind(SocketAddress firstLocalAddress, SocketAddress... addresses) throws IOException {
+        if (firstLocalAddress == null) {
+            bind(getDefaultLocalAddresses());
+        }
+
+        if ((addresses == null) || (addresses.length == 0)) {
+            bind(getDefaultLocalAddresses());
+            return;
+        }
+
+        List<SocketAddress> localAddresses = new ArrayList<SocketAddress>(2);
+        localAddresses.add(firstLocalAddress);
+
+        for (SocketAddress address : addresses) {
+            localAddresses.add(address);
+        }
+
+        bind(localAddresses);
+    }
+
+    public final void bind(Iterable<? extends SocketAddress> localAddresses) throws IOException {
+        if (isDisposing()) {
+            throw new IllegalStateException("The Accpetor disposed is being disposed.");
+        }
+
+        if (localAddresses == null) {
+            throw new IllegalArgumentException("localAddresses");
+        }
+
+        List<SocketAddress> localAddressesCopy = new ArrayList<SocketAddress>();
+
+        for (SocketAddress a : localAddresses) {
+            checkAddressType(a);
+            localAddressesCopy.add(a);
+        }
+
+        if (localAddressesCopy.isEmpty()) {
+            throw new IllegalArgumentException("localAddresses is empty.");
+        }
+
+        boolean activate = false;
+        synchronized (bindLock) {
+            synchronized (boundAddresses) {
+                if (boundAddresses.isEmpty()) {
+                    activate = true;
+                }
+            }
+
+            if (getHandler() == null) {
+                throw new IllegalStateException("handler is not set.");
+            }
+
+            try {
+                Set<SocketAddress> addresses = bindInternal(localAddressesCopy);
+
+                synchronized (boundAddresses) {
+                    boundAddresses.addAll(addresses);
+                }
+            } catch (IOException e) {
+                throw e;
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new RuntimeIoException("Failed to bind to: " + getLocalAddresses(), e);
+            }
+        }
+
+        if (activate) {
+            getListeners().fireServiceActivated();
+        }
+    }
+
+    public final void unbind() {
+        unbind(getLocalAddresses());
+    }
+
+    public final void unbind(SocketAddress localAddress) {
+        if (localAddress == null) {
+            throw new IllegalArgumentException("localAddress");
+        }
+
+        List<SocketAddress> localAddresses = new ArrayList<SocketAddress>(1);
+        localAddresses.add(localAddress);
+        unbind(localAddresses);
+    }
+
+    public final void unbind(SocketAddress firstLocalAddress, SocketAddress... otherLocalAddresses) {
+        if (firstLocalAddress == null) {
+            throw new IllegalArgumentException("firstLocalAddress");
+        }
+        if (otherLocalAddresses == null) {
+            throw new IllegalArgumentException("otherLocalAddresses");
+        }
+
+        List<SocketAddress> localAddresses = new ArrayList<SocketAddress>();
+        localAddresses.add(firstLocalAddress);
+        Collections.addAll(localAddresses, otherLocalAddresses);
+        unbind(localAddresses);
+    }
+
+    public final void unbind(Iterable<? extends SocketAddress> localAddresses) {
+        if (localAddresses == null) {
+            throw new IllegalArgumentException("localAddresses");
+        }
+
+        boolean deactivate = false;
+        synchronized (bindLock) {
+            synchronized (boundAddresses) {
+                if (boundAddresses.isEmpty()) {
+                    return;
+                }
+
+                List<SocketAddress> localAddressesCopy = new ArrayList<SocketAddress>();
+                int specifiedAddressCount = 0;
+
+                for (SocketAddress a : localAddresses) {
+                    specifiedAddressCount++;
+
+                    if ((a != null) && boundAddresses.contains(a)) {
+                        localAddressesCopy.add(a);
+                    }
+                }
+
+                if (specifiedAddressCount == 0) {
+                    throw new IllegalArgumentException("localAddresses is empty.");
+                }
+
+                if (!localAddressesCopy.isEmpty()) {
+                    try {
+                        unbind0(localAddressesCopy);
+                    } catch (RuntimeException e) {
+                        throw e;
+                    } catch (Exception e) {
+                        throw new RuntimeIoException("Failed to unbind from: " + getLocalAddresses(), e);
+                    }
+
+                    boundAddresses.removeAll(localAddressesCopy);
+
+                    if (boundAddresses.isEmpty()) {
+                        deactivate = true;
+                    }
+                }
+            }
+        }
+
+        if (deactivate) {
+            getListeners().fireServiceDeactivated();
+        }
+    }
+
+    protected abstract Set<SocketAddress> bindInternal(List<? extends SocketAddress> localAddresses) throws Exception;
+
+    protected abstract void unbind0(List<? extends SocketAddress> localAddresses) throws Exception;
+
+    @Override
+    public String toString() {
+        TransportMetadata m = getTransportMetadata();
+        return '('
+                + m.getProviderName()
+                + ' '
+                + m.getName()
+                + " acceptor: "
+                + (isActive() ? "localAddress(es): " + getLocalAddresses() + ", managedSessionCount: "
+                        + getManagedSessionCount() : "not bound") + ')';
+    }
+
+    private void checkAddressType(SocketAddress a) {
+        if (a != null && !getTransportMetadata().getAddressType().isAssignableFrom(a.getClass())) {
+            throw new IllegalArgumentException("localAddress type: " + a.getClass().getSimpleName() + " (expected: "
+                    + getTransportMetadata().getAddressType().getSimpleName() + ")");
+        }
+    }
+
+    public static class AcceptorOperationFuture extends ServiceOperationFuture {
+        private final List<SocketAddress> localAddresses;
+
+        public AcceptorOperationFuture(List<? extends SocketAddress> localAddresses) {
+            this.localAddresses = new ArrayList<SocketAddress>(localAddresses);
+        }
+
+        public final List<SocketAddress> getLocalAddresses() {
+            return Collections.unmodifiableList(localAddresses);
+        }
+
+        /**
+         * @see Object#toString()
+         */
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+
+            sb.append("Acceptor operation : ");
+
+            if (localAddresses != null) {
+                boolean isFirst = true;
+
+                for (SocketAddress address : localAddresses) {
+                    if (isFirst) {
+                        isFirst = false;
+                    } else {
+                        sb.append(", ");
+                    }
+
+                    sb.append(address);
+                }
+            }
+            return sb.toString();
+        }
+    }
+}
+```
+
+### AbstractPollingIoAcceptor
+
+AbstractPollingIoAcceptor是一个抽象类，使用轮询策略的基本实现，底层sockets会一直轮询检查，有socket需要处理的时候唤醒。
+
+```
+public abstract class AbstractPollingIoAcceptor<S extends AbstractIoSession, H> extends AbstractIoAcceptor {
+    //信号量，确保Selector在创建完成之前首先唤醒
+    private final Semaphore lock = new Semaphore(1);
+
+    private final IoProcessor<S> processor;
+
+    private final boolean createdProcessor;
+
+    private final Queue<AcceptorOperationFuture> registerQueue = new ConcurrentLinkedQueue<AcceptorOperationFuture>();
+
+    private final Queue<AcceptorOperationFuture> cancelQueue = new ConcurrentLinkedQueue<AcceptorOperationFuture>();
+
+    private final Map<SocketAddress, H> boundHandles = Collections.synchronizedMap(new HashMap<SocketAddress, H>());
+
+    private final ServiceOperationFuture disposalFuture = new ServiceOperationFuture();
+
+    //acceptor创建和初始化完成标志
+    private volatile boolean selectable;
+
+    //负责接收传入请求的线程
+    private AtomicReference<Acceptor> acceptorRef = new AtomicReference<Acceptor>();
+
+    protected boolean reuseAddress = false;
+
+    //可以被接收的socket的数目，默认50
+    protected int backlog = 50;
+
+    protected AbstractPollingIoAcceptor(IoSessionConfig sessionConfig, Class<? extends IoProcessor<S>> processorClass) {
+        this(sessionConfig, null, new SimpleIoProcessorPool<S>(processorClass), true, null);
+    }
+    
+    protected AbstractPollingIoAcceptor(IoSessionConfig sessionConfig, Class<? extends IoProcessor<S>> processorClass,
+            int processorCount) {
+        this(sessionConfig, null, new SimpleIoProcessorPool<S>(processorClass, processorCount), true, null);
+    }
+
+    protected AbstractPollingIoAcceptor(IoSessionConfig sessionConfig, Class<? extends IoProcessor<S>> processorClass,
+            int processorCount, SelectorProvider selectorProvider ) {
+        this(sessionConfig, null, new SimpleIoProcessorPool<S>(processorClass, processorCount, selectorProvider), true, selectorProvider);
+    }
+
+    protected AbstractPollingIoAcceptor(IoSessionConfig sessionConfig, IoProcessor<S> processor) {
+        this(sessionConfig, null, processor, false, null);
+    }
+
+    protected AbstractPollingIoAcceptor(IoSessionConfig sessionConfig, Executor executor, IoProcessor<S> processor) {
+        this(sessionConfig, executor, processor, false, null);
+    }
+	
+    private AbstractPollingIoAcceptor(IoSessionConfig sessionConfig, Executor executor, IoProcessor<S> processor,
+            boolean createdProcessor, SelectorProvider selectorProvider) {
+        super(sessionConfig, executor);
+
+        if (processor == null) {
+            throw new IllegalArgumentException("processor");
+        }
+
+        this.processor = processor;
+        this.createdProcessor = createdProcessor;
+
+        try {
+            //初始化selector，交给子类实现
+            init(selectorProvider);
+
+            //可接受请求标志为true
+            selectable = true;
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeIoException("Failed to initialize.", e);
+        } finally {
+            if (!selectable) {
+                try {
+                		//销毁方法交给子类实现
+                    destroy();
+                } catch (Exception e) {
+                    ExceptionMonitor.getInstance().exceptionCaught(e);
+                }
+            }
+        }
+    }
+
+    protected abstract void init() throws Exception;
+    protected abstract void init(SelectorProvider selectorProvider) throws Exception;
+    protected abstract void destroy() throws Exception;
+
+    //可接受连接的数目
+    protected abstract int select() throws Exception;
+
+    protected abstract void wakeup();
+    protected abstract Iterator<H> selectedHandles();
+    protected abstract H open(SocketAddress localAddress) throws Exception;
+    protected abstract SocketAddress localAddress(H handle) throws Exception;
+    protected abstract S accept(IoProcessor<S> processor, H handle) throws Exception;
+    protected abstract void close(H handle) throws Exception;
+    @Override
+    protected void dispose0() throws Exception {
+        unbind();
+        startupAcceptor();
+        wakeup();
+    }
+    
+    @Override
+    protected final Set<SocketAddress> bindInternal(List<? extends SocketAddress> localAddresses) throws Exception {
+        AcceptorOperationFuture request = new AcceptorOperationFuture(localAddresses);
+
+        registerQueue.add(request);
+
+        startupAcceptor();
+
+        try {
+            lock.acquire();
+
+            Thread.sleep(10);
+            wakeup();
+        } finally {
+            lock.release();
+        }
+
+        request.awaitUninterruptibly();
+
+        if (request.getException() != null) {
+            throw request.getException();
+        }
+
+        Set<SocketAddress> newLocalAddresses = new HashSet<SocketAddress>();
+
+        for (H handle : boundHandles.values()) {
+            newLocalAddresses.add(localAddress(handle));
+        }
+
+        return newLocalAddresses;
+    }
+
+    //绑定或者解绑的时候调用，accpetor为空，创建一个新的
+    private void startupAcceptor() throws InterruptedException {
+        if (!selectable) {
+            registerQueue.clear();
+            cancelQueue.clear();
+        }
+
+        Acceptor acceptor = acceptorRef.get();
+
+        if (acceptor == null) {
+            lock.acquire();
+            acceptor = new Acceptor();
+
+            if (acceptorRef.compareAndSet(null, acceptor)) {
+                executeWorker(acceptor);
+            } else {
+                lock.release();
+            }
+        }
+    }
+
+    @Override
+    protected final void unbind0(List<? extends SocketAddress> localAddresses) throws Exception {
+        AcceptorOperationFuture future = new AcceptorOperationFuture(localAddresses);
+
+        cancelQueue.add(future);
+        startupAcceptor();
+        wakeup();
+
+        future.awaitUninterruptibly();
+        if (future.getException() != null) {
+            throw future.getException();
+        }
+    }
+
+    private class Acceptor implements Runnable {
+        public void run() {
+            assert (acceptorRef.get() == this);
+
+            int nHandles = 0;
+
+            // Release the lock
+            lock.release();
+
+            while (selectable) {
+                try {
+                    
+                    int selected = select();
+
+                    nHandles += registerHandles();
+                    
+                    if (nHandles == 0) {
+                        acceptorRef.set(null);
+
+                        if (registerQueue.isEmpty() && cancelQueue.isEmpty()) {
+                            assert (acceptorRef.get() != this);
+                            break;
+                        }
+
+                        if (!acceptorRef.compareAndSet(null, this)) {
+                            assert (acceptorRef.get() != this);
+                            break;
+                        }
+
+                        assert (acceptorRef.get() == this);
+                    }
+
+                    if (selected > 0) {
+                        processHandles(selectedHandles());
+                    }
+
+                    nHandles -= unregisterHandles();
+                } catch (ClosedSelectorException cse) {
+                    ExceptionMonitor.getInstance().exceptionCaught(cse);
+                    break;
+                } catch (Exception e) {
+                    ExceptionMonitor.getInstance().exceptionCaught(e);
+
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e1) {
+                        ExceptionMonitor.getInstance().exceptionCaught(e1);
+                    }
+                }
+            }
+
+            if (selectable && isDisposing()) {
+                selectable = false;
+                try {
+                    if (createdProcessor) {
+                        processor.dispose();
+                    }
+                } finally {
+                    try {
+                        synchronized (disposalLock) {
+                            if (isDisposing()) {
+                                destroy();
+                            }
+                        }
+                    } catch (Exception e) {
+                        ExceptionMonitor.getInstance().exceptionCaught(e);
+                    } finally {
+                        disposalFuture.setDone();
+                    }
+                }
+            }
+        }
+
+        //处理新的session
+        private void processHandles(Iterator<H> handles) throws Exception {
+            while (handles.hasNext()) {
+                H handle = handles.next();
+                handles.remove();
+
+                S session = accept(processor, handle);
+
+                if (session == null) {
+                    continue;
+                }
+
+                initSession(session, null, null);
+
+                session.getProcessor().add(session);
+            }
+        }
+    }
+
+    //简历socket通信
+    private int registerHandles() {
+        for (;;) {
+            AcceptorOperationFuture future = registerQueue.poll();
+
+            if (future == null) {
+                return 0;
+            }
+
+            Map<SocketAddress, H> newHandles = new ConcurrentHashMap<SocketAddress, H>();
+            List<SocketAddress> localAddresses = future.getLocalAddresses();
+
+            try {
+                
+                for (SocketAddress a : localAddresses) {
+                    H handle = open(a);
+                    newHandles.put(localAddress(handle), handle);
+                }
+                boundHandles.putAll(newHandles);
+
+                future.setDone();
+                return newHandles.size();
+            } catch (Exception e) {
+                future.setException(e);
+            } finally {
+                if (future.getException() != null) {
+                    for (H handle : newHandles.values()) {
+                        try {
+                            close(handle);
+                        } catch (Exception e) {
+                            ExceptionMonitor.getInstance().exceptionCaught(e);
+                        }
+                    }
+
+                    wakeup();
+                }
+            }
+        }
+    }
+
+    private int unregisterHandles() {
+        int cancelledHandles = 0;
+        for (;;) {
+            AcceptorOperationFuture future = cancelQueue.poll();
+            if (future == null) {
+                break;
+            }
+
+            // close the channels
+            for (SocketAddress a : future.getLocalAddresses()) {
+                H handle = boundHandles.remove(a);
+
+                if (handle == null) {
+                    continue;
+                }
+
+                try {
+                    close(handle);
+                    wakeup(); // wake up again to trigger thread death
+                } catch (Exception e) {
+                    ExceptionMonitor.getInstance().exceptionCaught(e);
+                } finally {
+                    cancelledHandles++;
+                }
+            }
+
+            future.setDone();
+        }
+
+        return cancelledHandles;
+    }
+
+    public final IoSession newSession(SocketAddress remoteAddress, SocketAddress localAddress) {
+        throw new UnsupportedOperationException();
+    }
+
+    public int getBacklog() {
+        return backlog;
+    }
+    public void setBacklog(int backlog) {
+        synchronized (bindLock) {
+            if (isActive()) {
+                throw new IllegalStateException("backlog can't be set while the acceptor is bound.");
+            }
+
+            this.backlog = backlog;
+        }
+    }
+
+    public boolean isReuseAddress() {
+        return reuseAddress;
+    }
+
+    public void setReuseAddress(boolean reuseAddress) {
+        synchronized (bindLock) {
+            if (isActive()) {
+                throw new IllegalStateException("backlog can't be set while the acceptor is bound.");
+            }
+
+            this.reuseAddress = reuseAddress;
+        }
+    }
+    public SocketSessionConfig getSessionConfig() {
+        return (SocketSessionConfig)sessionConfig;
+    }
+}
+```
+
+### SocketAcceptor
+SocketAcceptor也是一个接口，套接字传输的Acceptor，继承自IoAcceptor，处理TCP/IP协议的连接。
+
+```
+public interface SocketAcceptor extends IoAcceptor {
+    //返回InetSocketAddress，覆盖IoAcceptor中的getLocalAddress方法
+    InetSocketAddress getLocalAddress();
+    InetSocketAddress getDefaultLocalAddress();
+	//设置本机地址
+    void setDefaultLocalAddress(InetSocketAddress localAddress);
+
+    //SO_REUSEADDR是否可用
+    boolean isReuseAddress();
+
+    //设置SO_REUSEADDR可用
+    void setReuseAddress(boolean reuseAddress);
+
+    //可用来连接的数目
+    int getBacklog();
+    void setBacklog(int backlog);
+
+    SocketSessionConfig getSessionConfig();
+}
+```
+
+### DatagramAcceptor
+DatagramAcceptor也是一个接口，UDP传输的Acceptor，继承自IoAcceptor，处理UDP/IP协议的连接。方法与SocketAcceptor类似。
+
+```
+public interface DatagramAcceptor extends IoAcceptor {
+    InetSocketAddress getLocalAddress();
+    InetSocketAddress getDefaultLocalAddress();
+    void setDefaultLocalAddress(InetSocketAddress localAddress);
+
+	//
+    IoSessionRecycler getSessionRecycler();
+    void setSessionRecycler(IoSessionRecycler sessionRecycler);
+
+    DatagramSessionConfig getSessionConfig();
+}
+
+```
+
+### NioSocketAcceptor
+
+NioSocketAcceptor是一个final类，继承自AbstractPollingIoAcceptor，实现了SocketAcceptor接口。
+
+final类不能被继承，不能被覆盖，由于它的方法不能够被覆盖，所以其地址引用和装载在编译期间完成，而不是在运行期间由JVM进行复杂的装载，因而简单和有效。
+
+
+```
+public final class NioSocketAcceptor extends AbstractPollingIoAcceptor<NioSession, ServerSocketChannel>
+implements SocketAcceptor {
+
+    private volatile Selector selector;
+    private volatile SelectorProvider selectorProvider = null;
+
+    public NioSocketAcceptor() {
+        super(new DefaultSocketSessionConfig(), NioProcessor.class);
+        ((DefaultSocketSessionConfig) getSessionConfig()).init(this);
+    }
+
+    public NioSocketAcceptor(int processorCount) {
+        super(new DefaultSocketSessionConfig(), NioProcessor.class, processorCount);
+        ((DefaultSocketSessionConfig) getSessionConfig()).init(this);
+    }
+
+    public NioSocketAcceptor(IoProcessor<NioSession> processor) {
+        super(new DefaultSocketSessionConfig(), processor);
+        ((DefaultSocketSessionConfig) getSessionConfig()).init(this);
+    }
+
+    public NioSocketAcceptor(Executor executor, IoProcessor<NioSession> processor) {
+        super(new DefaultSocketSessionConfig(), executor, processor);
+        ((DefaultSocketSessionConfig) getSessionConfig()).init(this);
+    }
+    
+    public NioSocketAcceptor(int processorCount, SelectorProvider selectorProvider) {
+        super(new DefaultSocketSessionConfig(), NioProcessor.class, processorCount, selectorProvider);
+        ((DefaultSocketSessionConfig) getSessionConfig()).init(this);
+        this.selectorProvider = selectorProvider;
+    }
+
+    @Override
+    protected void init() throws Exception {
+        selector = Selector.open();
+    }
+
+    @Override
+    protected void init(SelectorProvider selectorProvider) throws Exception {
+        this.selectorProvider = selectorProvider;
+
+        if (selectorProvider == null) {
+            selector = Selector.open();
+        } else {
+            selector = selectorProvider.openSelector();
+        }
+    }
+
+    @Override
+    protected void destroy() throws Exception {
+        if (selector != null) {
+            selector.close();
+        }
+    }
+
+    public TransportMetadata getTransportMetadata() {
+        return NioSocketSession.METADATA;
+    }
+
+    @Override
+    public InetSocketAddress getLocalAddress() {
+        return (InetSocketAddress) super.getLocalAddress();
+    }
+
+    @Override
+    public InetSocketAddress getDefaultLocalAddress() {
+        return (InetSocketAddress) super.getDefaultLocalAddress();
+    }
+
+    public void setDefaultLocalAddress(InetSocketAddress localAddress) {
+        setDefaultLocalAddress((SocketAddress) localAddress);
+    }
+
+    @Override
+    protected NioSession accept(IoProcessor<NioSession> processor, ServerSocketChannel handle) throws Exception {
+
+        SelectionKey key = null;
+
+        if (handle != null) {
+            key = handle.keyFor(selector);
+        }
+
+        if ((key == null) || (!key.isValid()) || (!key.isAcceptable())) {
+            return null;
+        }
+
+        // accept the connection from the client
+        SocketChannel ch = handle.accept();
+
+        if (ch == null) {
+            return null;
+        }
+
+        return new NioSocketSession(this, processor, ch);
+    }
+
+    @Override
+    protected ServerSocketChannel open(SocketAddress localAddress) throws Exception {
+        // Creates the listening ServerSocket
+
+        ServerSocketChannel channel = null;
+
+        if (selectorProvider != null) {
+            channel = selectorProvider.openServerSocketChannel();
+        } else {
+            channel = ServerSocketChannel.open();
+        }
+
+        boolean success = false;
+
+        try {
+            // This is a non blocking socket channel
+            channel.configureBlocking(false);
+
+            // Configure the server socket,
+            ServerSocket socket = channel.socket();
+
+            // Set the reuseAddress flag accordingly with the setting
+            socket.setReuseAddress(isReuseAddress());
+
+            // and bind.
+            try {
+                socket.bind(localAddress, getBacklog());
+            } catch (IOException ioe) {
+                // Add some info regarding the address we try to bind to the
+                // message
+                String newMessage = "Error while binding on " + localAddress + "\n" + "original message : "
+                        + ioe.getMessage();
+                Exception e = new IOException(newMessage);
+                e.initCause(ioe.getCause());
+
+                // And close the channel
+                channel.close();
+
+                throw e;
+            }
+
+            // Register the channel within the selector for ACCEPT event
+            channel.register(selector, SelectionKey.OP_ACCEPT);
+            success = true;
+        } finally {
+            if (!success) {
+                close(channel);
+            }
+        }
+        return channel;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected SocketAddress localAddress(ServerSocketChannel handle) throws Exception {
+        return handle.socket().getLocalSocketAddress();
+    }
+
+    /**
+     * Check if we have at least one key whose corresponding channels is
+     * ready for I/O operations.
+     *
+     * This method performs a blocking selection operation.
+     * It returns only after at least one channel is selected,
+     * this selector's wakeup method is invoked, or the current thread
+     * is interrupted, whichever comes first.
+     * 
+     * @return The number of keys having their ready-operation set updated
+     * @throws IOException If an I/O error occurs
+     * @throws ClosedSelectorException If this selector is closed
+     */
+    @Override
+    protected int select() throws Exception {
+        return selector.select();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected Iterator<ServerSocketChannel> selectedHandles() {
+        return new ServerSocketChannelIterator(selector.selectedKeys());
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void close(ServerSocketChannel handle) throws Exception {
+        SelectionKey key = handle.keyFor(selector);
+
+        if (key != null) {
+            key.cancel();
+        }
+
+        handle.close();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void wakeup() {
+        selector.wakeup();
+    }
+
+    /**
+     * Defines an iterator for the selected-key Set returned by the
+     * selector.selectedKeys(). It replaces the SelectionKey operator.
+     */
+    private static class ServerSocketChannelIterator implements Iterator<ServerSocketChannel> {
+        /** The selected-key iterator */
+        private final Iterator<SelectionKey> iterator;
+
+        /**
+         * Build a SocketChannel iterator which will return a SocketChannel instead of
+         * a SelectionKey.
+         * 
+         * @param selectedKeys The selector selected-key set
+         */
+        private ServerSocketChannelIterator(Collection<SelectionKey> selectedKeys) {
+            iterator = selectedKeys.iterator();
+        }
+
+        /**
+         * Tells if there are more SockectChannel left in the iterator
+         * @return <tt>true</tt> if there is at least one more
+         * SockectChannel object to read
+         */
+        public boolean hasNext() {
+            return iterator.hasNext();
+        }
+
+        /**
+         * Get the next SocketChannel in the operator we have built from
+         * the selected-key et for this selector.
+         * 
+         * @return The next SocketChannel in the iterator
+         */
+        public ServerSocketChannel next() {
+            SelectionKey key = iterator.next();
+
+            if (key.isValid() && key.isAcceptable()) {
+                return (ServerSocketChannel) key.channel();
+            }
+
+            return null;
+        }
+
+        /**
+         * Remove the current SocketChannel from the iterator
+         */
+        public void remove() {
+            iterator.remove();
+        }
+    }
+}
+```
 
 ## IoConnector
 具体实现类：
