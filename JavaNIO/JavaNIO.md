@@ -215,3 +215,132 @@ public abstract class Buffer {
 
 }
 ```
+
+## 比较
+
+两个缓冲区相等的充要条件：
+
+* 两个对象类型相同。
+* 两个对象都剩余同样数量的元素。
+* 在每个缓冲区中应被get函数返回的剩余数据元素序列必须一致。
+
+## 创建缓冲区
+
+以CharBuffer为例，对于IntBuffer，DoubleBuffer，ShortBuffer，LongBuffer，FloatBuffer，ByteBuffer也适用。
+
+分配容量为100个char变量的CharBuffer：
+
+`CharBuffer charBuffer = CharBuffer.allocate(100);`
+
+隐含的从堆中分配了一个char型数组作为备份存储器来存储100个char变量。
+
+用自已的数组做缓冲区的备份存储器，使用wrap()方法：
+
+```
+char [] myArray = new char[100];
+CharBuffer charBuffer = CharBuffer.wrap(myArray);
+```
+
+通过allocate()或wrap()方法创建的缓冲区通常都是间接的，使用备份数组。
+
+hasArray()方法表示是否有一个可存取的备份数组，如果返回true，array()方法会返回这个缓冲区对象所使用的数组存储空间的引用。
+
+## 复制缓冲区
+
+duplicat()方法创建一个与原始缓冲区相似的新缓冲区，两个缓冲区共享数据元素，有同样的容量，每个缓冲区有各自的位置，上界，标记。对一个缓冲区内的数据元素做的改变会反应在另一个缓冲区上。
+
+slice()，分割缓冲区，此方法创建一个从原始缓冲区的当前位置开始的新缓冲区，并且其容量是原始缓冲区的剩余元素数量（limit - position）。这个新缓冲区与原始缓冲区共享一段数据元素子序列。
+
+## 字节缓冲区
+
+### 直接缓冲区
+直接缓冲区被用于与通道和固有I/O例程交互。
+
+直接ByteBuffer通过ByteBuffer.allocateDirect()方法创建。
+
+# 通道Channel
+
+channel
+
+```
+public interface Channel extends Closeable {
+
+    //检查一个通道是否打开
+    public boolean isOpen();
+
+    //关闭一个打开的通道
+    public void close() throws IOException;
+
+}
+```
+
+InterruptibleChannel是一个标记接口，当被通道使用时，可标志该通道是可以中断的。
+
+WritableByteChannel和ReadableByteChannel，面向字节的子接口，通道只能在字节缓冲区上操作。
+
+## 打开通道
+
+FileChannel，SocketChannel，ServerSocketChannel，DatagramChannel。
+
+Socket通道有可以直接创建新socket通道的工厂方法。
+
+FileChannel对象只能通过在一个打开的RandomAccessFile，FileInputStream，FileOutputStream对象上调用getChannel()方法来获取。
+
+```
+SocketChannel sc = SocketChannel.open( );sc.connect (new InetSocketAddress ("somehost", someport));
+```
+
+```ServerSocketChannel ssc = ServerSocketChannel.open( );ssc.socket( ).bind (new InetSocketAddress (somelocalport));
+```
+
+```DatagramChannel dc = DatagramChannel.open( );
+```
+
+```RandomAccessFile raf = new RandomAccessFile ("somefile", "r");FileChannel fc = raf.getChannel( );
+```
+
+通道可以以阻塞或非阻塞方式运行，非阻塞模式的通道永远不会让调用的线程休眠，请求的操作要么立即完成，要么返回一个结果表明未进行任何操作，只有面向流的通道如sockets和pipe才能使用非阻塞模式。
+
+socket 通道类从 SelectableChannel 引申而来。从 SelectableChannel 引申而 来的类可以和支持有条件的选择(readiness selectio)的选择器(Selectors)一起使用。将非阻塞 I/O 和选择器组合起来可以使您的程序利用多路复用 I/O(multiplexed I/O)。
+
+## Scatter/Gather
+是指在多个缓冲区上实现一个简单的I/O操作。
+
+对于一个write操作，数据是从几个缓冲区按顺序抽取（gather），并沿着通道发送的；
+
+对read操作，从通道读取的数据会按顺序被散步（scatter）到多个缓冲区，将每个缓冲区填满直至通道中的数据或缓冲区的最大空间被消耗完。
+
+## 文件通道
+文件通道总是阻塞式的，不能被设置为非阻塞。
+
+FileChannel对象是线程安全的。多个进程可以在同一个实例上并发调用方法而 不会引起任何问题,不过并非所有的操作都是多线程的(multithreaded)。影响通道位置或者影响 文件大小的操作都是单线程的(single-threaded)。如果有一个线程已经在执行会影响通道位置或文 件大小的操作,那么其他 试进行此类操作之一的线程必须等待。并发行为也会受到底层的操作系 统或文件系统影响。
+
+每个 FileChannel 都有一个 “file position”的概念。这个 position 值 决定文件中哪一处的数据接下来将被读或者写。
+
+
+## 内存映射文件
+通过内存映射机制来访问一个文件会比使用常规方法读写高效得多,甚至比使用通道的效率都高。因为不需要做明确的系统调用,那会很消耗时间。更重要的是,操作系统的虚拟内存可以自动 缓存内存页(memory page)。这些页是用系统内存来缓存的,所以不会消耗 Java 虚拟机内存  (memory heap)。
+
+
+## Channel-to-Channel 传输
+
+transferTo( )和 transferFrom( )方法允许将一个通道交叉连接到另一个通道,而不需要通过一个 中间缓冲区来传递数据。只有 FileChannel 类有这两个方法,因此 channel-to-channel 传输中通道之 一必须是 FileChannel。
+
+## Socket通道
+新的 socket 通道类可以运行非阻塞模式并且是可选择的。
+
+### ServerSocketChannel
+ServerSocketChannel 是一个基于通道的 socket 监听器。它同我们所熟悉的 java.net.ServerSocket 执行相同的基本任务,不过它增加了通道语义,因此能够在非阻塞模式下运行。
+
+### SocketChannel
+
+Socket 通道是线程安全的。并发访问时无需特别措施来保护发起访问的多个线程,不过任何时候都只有一个读操作和一个写操作在进行中。
+
+### DatagramChannel
+DatagramChannel 则模拟包导向的无连接协议(如 UDP/IP)
+
+## 管道
+
+
+# 选择器
+
