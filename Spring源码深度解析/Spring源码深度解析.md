@@ -2531,3 +2531,267 @@ protected void prepareBeanFactory(ConfigurableListableBeanFactory beanFactory) {
 
 # BeanFactory的后处理
 
+# AOP
+## 动态AOP自定义标签
+
+AspectJAutoProxyBeanDefinitionParser
+
+```
+public BeanDefinition parse(Element element, ParserContext parserContext) {
+	//注册AnnotationAwareAspectJAutoProxyCreator
+	AopNamespaceUtils.registerAspectJAnnotationAutoProxyCreatorIfNecessary(parserContext, element);
+	//对于注解中子类的处理
+	extendBeanDefinition(element, parserContext);
+	return null;
+}
+```
+
+```
+public static void registerAspectJAutoProxyCreatorIfNecessary(
+			ParserContext parserContext, Element sourceElement) {
+	//注册或升级AutoProxyCreator定义beanName为org.Springframework.aop.config.internalAutoProxyCreator的BeanDefinition
+	BeanDefinition beanDefinition = AopConfigUtils.registerAspectJAutoProxyCreatorIfNecessary(
+			parserContext.getRegistry(), parserContext.extractSource(sourceElement));
+			//对于proxy-target-class以及expose-proxy属性的处理
+	useClassProxyingIfNecessary(parserContext.getRegistry(), sourceElement);
+	//注册组件通知，便于监听器做进一步处理
+	registerComponentIfNecessary(beanDefinition, parserContext);
+}
+```
+
+1. 注册或升级AnnotationAwareAspectJAutoProxyCreator
+	
+	AOP实现基本都是靠AnnotationAwareAspectJAutoProxyCreator去完成，他可以根据@Point注解定义的切点来自动代理相匹配的bean。Spring使用自动注册AnnotationAwareAspectJAutoProxyCreator的功能简化：
+	
+	```
+	private static BeanDefinition registerOrEscalateApcAsRequired(Class cls, BeanDefinitionRegistry registry, Object source) {
+	//如果已经存在自动代理创建器且存在的与现在的不一致，需要根据优先级来判断到底需要使用哪个
+	if (registry.containsBeanDefinition(AUTO_PROXY_CREATOR_BEAN_NAME)) {
+		BeanDefinition apcDefinition = registry.getBeanDefinition(AUTO_PROXY_CREATOR_BEAN_NAME);
+		if (!cls.getName().equals(apcDefinition.getBeanClassName())) {
+			int currentPriority = findPriorityForClass(apcDefinition.getBeanClassName());
+			int requiredPriority = findPriorityForClass(cls);
+			if (currentPriority < requiredPriority) {
+				apcDefinition.setBeanClassName(cls.getName());
+			}
+		}
+		return null;
+	}
+	RootBeanDefinition beanDefinition = new RootBeanDefinition(cls);
+	beanDefinition.setSource(source);
+	beanDefinition.getPropertyValues().add("order", Ordered.HIGHEST_PRECEDENCE);
+	beanDefinition.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
+	registry.registerBeanDefinition(AUTO_PROXY_CREATOR_BEAN_NAME, beanDefinition);
+	return beanDefinition;
+}
+	```
+	
+2. 处理proxy-target-class以及expose-proxy属性
+
+	```
+	private static void useClassProxyingIfNecessary(BeanDefinitionRegistry registry, Element sourceElement) {
+	//proxy-target-class
+	AopConfigUtils.forceAutoProxyCreatorToUseClassProxying(registry);
+	//expose-proxy
+	AopConfigUtils.forceAutoProxyCreatorToExposeProxy(registry);
+	}
+	```
+	
+	* proxy-target-class SpringAOP部分使用JDK动态代理或者CGLIB来为目标对象创建代理。强制使用CGLIB代理需要将<aop:config>的proxy-target-class设为true，但是无法通知final方法。
+
+# 创建AOP代理
+
+```
+public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+	if (bean != null) {
+		//根据给定的class和beanName构建出key
+		Object cacheKey = getCacheKey(bean.getClass(), beanName);
+		if (!this.earlyProxyReferences.containsKey(cacheKey)) {
+			//如果适合被代理，则需要封装指定bean
+			return wrapIfNecessary(bean, beanName, cacheKey);
+		}
+	}
+	return bean;
+}
+
+protected Object wrapIfNecessary(Object bean, String beanName, Object cacheKey) {
+	//已经处理过
+	if (beanName != null && this.targetSourcedBeans.containsKey(beanName)) {
+		return bean;
+	}
+	//无需增强
+	if (Boolean.FALSE.equals(this.advisedBeans.get(cacheKey))) {
+		return bean;
+	}
+	//基础设施类不需要被代理，或者配置了指定bean不需要自动代理
+	if (isInfrastructureClass(bean.getClass()) || shouldSkip(bean.getClass(), beanName)) {
+		this.advisedBeans.put(cacheKey, Boolean.FALSE);
+		return bean;
+	}
+
+	//如果存在增强方法，则创建代理
+	Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(bean.getClass(), beanName, null);
+	if (specificInterceptors != DO_NOT_PROXY) {
+		this.advisedBeans.put(cacheKey, Boolean.TRUE);
+		//创建代理
+		Object proxy = createProxy(bean.getClass(), beanName, specificInterceptors, new SingletonTargetSource(bean));
+		this.proxyTypes.put(cacheKey, proxy.getClass());
+		return proxy;
+	}
+
+	this.advisedBeans.put(cacheKey, Boolean.FALSE);
+	return bean;
+}
+```
+
+创建代理主要包含两个步骤：
+
+1. 获取增强方法或者增强器。
+2. 根据获取的增强进行代理。
+
+获取增强方法的实现：
+
+```
+protected Object[] getAdvicesAndAdvisorsForBean(Class beanClass, String beanName, TargetSource targetSource) {
+	List advisors = findEligibleAdvisors(beanClass, beanName);
+}
+
+protected List<Advisor> findEligibleAdvisors(Class beanClass, String beanName) {
+	//获取所有增强
+	List<Advisor> candidateAdvisors = findCandidateAdvisors();
+	//寻找所有增强中适用于bean的增强并应用
+	List<Advisor> eligibleAdvisors = findAdvisorsThatCanApply(candidateAdvisors, beanClass, beanName);
+	extendAdvisors(eligibleAdvisors);
+	if (!eligibleAdvisors.isEmpty()) {
+		eligibleAdvisors = sortAdvisors(eligibleAdvisors);
+	}
+	return eligibleAdvisors;
+}
+```
+
+## 获取增强器
+
+```
+protected List<Advisor> findCandidateAdvisors() {
+	advisors.addAll(this.aspectJAdvisorsBuilder.buildAspectJAdvisors());
+}
+
+public List<Advisor> buildAspectJAdvisors() {
+	List<String> aspectNames = null;
+
+	synchronized (this) {
+		aspectNames = this.aspectBeanNames;
+		if (aspectNames == null) {
+			List<Advisor> advisors = new LinkedList<Advisor>();
+			aspectNames = new LinkedList<String>();
+			//获取所有beanName
+			String[] beanNames =
+					BeanFactoryUtils.beanNamesForTypeIncludingAncestors(this.beanFactory, Object.class, true, false);
+			//循环找出对应增强方法
+			for (String beanName : beanNames) {
+				if (!isEligibleBean(beanName)) {
+					continue;
+				}
+				//获取对应的bean类型
+				Class beanType = this.beanFactory.getType(beanName);
+				if (beanType == null) {
+					continue;
+				}
+				//存在Aspect注解
+				if (this.advisorFactory.isAspect(beanType)) {
+					aspectNames.add(beanName);
+					AspectMetadata amd = new AspectMetadata(beanType, beanName);
+					if (amd.getAjType().getPerClause().getKind() == PerClauseKind.SINGLETON) {
+						MetadataAwareAspectInstanceFactory factory =
+								new BeanFactoryAspectInstanceFactory(this.beanFactory, beanName);
+						//解析标记AspectJ注解中的增强方法
+						List<Advisor> classAdvisors = this.advisorFactory.getAdvisors(factory);
+						if (this.beanFactory.isSingleton(beanName)) {
+							this.advisorsCache.put(beanName, classAdvisors);
+						}
+						else {
+							this.aspectFactoryCache.put(beanName, factory);
+						}
+						advisors.addAll(classAdvisors);
+					}
+					else {
+						// Per target or per this.
+						if (this.beanFactory.isSingleton(beanName)) {
+							throw new IllegalArgumentException("Bean with name '" + beanName +
+									"' is a singleton, but aspect instantiation model is not singleton");
+						}
+						MetadataAwareAspectInstanceFactory factory =
+								new PrototypeAspectInstanceFactory(this.beanFactory, beanName);
+						this.aspectFactoryCache.put(beanName, factory);
+						advisors.addAll(this.advisorFactory.getAdvisors(factory));
+					}
+				}
+			}
+			this.aspectBeanNames = aspectNames;
+			return advisors;
+		}
+	}
+
+	if (aspectNames.isEmpty()) {
+		return Collections.EMPTY_LIST;
+	}
+	//记录在缓存中
+	List<Advisor> advisors = new LinkedList<Advisor>();
+	for (String aspectName : aspectNames) {
+		List<Advisor> cachedAdvisors = this.advisorsCache.get(aspectName);
+		if (cachedAdvisors != null) {
+			advisors.addAll(cachedAdvisors);
+		}
+		else {
+			MetadataAwareAspectInstanceFactory factory = this.aspectFactoryCache.get(aspectName);
+			advisors.addAll(this.advisorFactory.getAdvisors(factory));
+		}
+	}
+	return advisors;
+}
+```
+
+增强器的获取：
+
+```
+public List<Advisor> getAdvisors(MetadataAwareAspectInstanceFactory maaif) {
+	//获取标记为AspectJ的类
+	final Class<?> aspectClass = maaif.getAspectMetadata().getAspectClass();
+	//获取标记为AspectJ的name
+	final String aspectName = maaif.getAspectMetadata().getAspectName();
+	//验证
+	validate(aspectClass);
+
+	final MetadataAwareAspectInstanceFactory lazySingletonAspectInstanceFactory =
+			new LazySingletonAspectInstanceFactoryDecorator(maaif);
+
+	final List<Advisor> advisors = new LinkedList<Advisor>();
+	for (Method method : getAdvisorMethods(aspectClass)) {
+		//普通增强器的获取，实现包括对切点的注解的获取以及根据注解信息生成增强
+		Advisor advisor = getAdvisor(method, lazySingletonAspectInstanceFactory, advisors.size(), aspectName);
+		if (advisor != null) {
+			advisors.add(advisor);
+		}
+	}
+
+	// If it's a per target aspect, emit the dummy instantiating aspect.
+	if (!advisors.isEmpty() && lazySingletonAspectInstanceFactory.getAspectMetadata().isLazilyInstantiated()) {
+		Advisor instantiationAdvisor = new SyntheticInstantiationAdvisor(lazySingletonAspectInstanceFactory);
+		advisors.add(0, instantiationAdvisor);
+	}
+
+	// Find introduction fields.
+	for (Field field : aspectClass.getDeclaredFields()) {
+		Advisor advisor = getDeclareParentsAdvisor(field);
+		if (advisor != null) {
+			advisors.add(advisor);
+		}
+	}
+
+	return advisors;
+}
+```
+
+暂先缓缓，看不下去了AOP
+
+# 数据库连接JDBC
