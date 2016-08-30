@@ -1349,7 +1349,7 @@ implements SocketAcceptor {
         ((DefaultSocketSessionConfig) getSessionConfig()).init(this);
         this.selectorProvider = selectorProvider;
     }
-
+	//使用Selector创建一个新的selector
     @Override
     protected void init() throws Exception {
         selector = Selector.open();
@@ -1465,44 +1465,19 @@ implements SocketAcceptor {
         }
         return channel;
     }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
     protected SocketAddress localAddress(ServerSocketChannel handle) throws Exception {
         return handle.socket().getLocalSocketAddress();
     }
 
-    /**
-     * Check if we have at least one key whose corresponding channels is
-     * ready for I/O operations.
-     *
-     * This method performs a blocking selection operation.
-     * It returns only after at least one channel is selected,
-     * this selector's wakeup method is invoked, or the current thread
-     * is interrupted, whichever comes first.
-     * 
-     * @return The number of keys having their ready-operation set updated
-     * @throws IOException If an I/O error occurs
-     * @throws ClosedSelectorException If this selector is closed
-     */
-    @Override
+        @Override
     protected int select() throws Exception {
         return selector.select();
     }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
     protected Iterator<ServerSocketChannel> selectedHandles() {
         return new ServerSocketChannelIterator(selector.selectedKeys());
     }
-
-    /**
-     * {@inheritDoc}
-     */
     @Override
     protected void close(ServerSocketChannel handle) throws Exception {
         SelectionKey key = handle.keyFor(selector);
@@ -1514,47 +1489,25 @@ implements SocketAcceptor {
         handle.close();
     }
 
-    /**
-     * {@inheritDoc}
-     */
+ 
     @Override
     protected void wakeup() {
         selector.wakeup();
     }
 
-    /**
-     * Defines an iterator for the selected-key Set returned by the
-     * selector.selectedKeys(). It replaces the SelectionKey operator.
-     */
+
     private static class ServerSocketChannelIterator implements Iterator<ServerSocketChannel> {
-        /** The selected-key iterator */
+       
         private final Iterator<SelectionKey> iterator;
 
-        /**
-         * Build a SocketChannel iterator which will return a SocketChannel instead of
-         * a SelectionKey.
-         * 
-         * @param selectedKeys The selector selected-key set
-         */
-        private ServerSocketChannelIterator(Collection<SelectionKey> selectedKeys) {
+              private ServerSocketChannelIterator(Collection<SelectionKey> selectedKeys) {
             iterator = selectedKeys.iterator();
         }
-
-        /**
-         * Tells if there are more SockectChannel left in the iterator
-         * @return <tt>true</tt> if there is at least one more
-         * SockectChannel object to read
-         */
         public boolean hasNext() {
             return iterator.hasNext();
         }
 
-        /**
-         * Get the next SocketChannel in the operator we have built from
-         * the selected-key et for this selector.
-         * 
-         * @return The next SocketChannel in the iterator
-         */
+        
         public ServerSocketChannel next() {
             SelectionKey key = iterator.next();
 
@@ -1565,9 +1518,7 @@ implements SocketAcceptor {
             return null;
         }
 
-        /**
-         * Remove the current SocketChannel from the iterator
-         */
+        
         public void remove() {
             iterator.remove();
         }
@@ -1688,4 +1639,12 @@ Mina所用的一个字节缓存。代替ByteBuffer：
 * ByteBuffer固定容量的特性，很难写入可变长度的数据
 
 IoBuffer是抽象类，不能直接被实例化。实现了Comparable接口。
+
+IoBufferAllocater 负责分配并管理缓存。要获取堆缓存分配的精确控制，你需要实现 IoBufferAllocater 接口。
+
+MINA 具有以下 IoBufferAllocater 实现：
+
+* SimpleBufferAllocator (默认) - 每次创建一个新的缓存
+* CachedBufferAllocator - 对扩展中可能会被复用的缓存进行高速缓存
+
 
