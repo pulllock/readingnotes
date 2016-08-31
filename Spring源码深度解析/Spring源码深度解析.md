@@ -2795,3 +2795,200 @@ public List<Advisor> getAdvisors(MetadataAwareAspectInstanceFactory maaif) {
 暂先缓缓，看不下去了AOP
 
 # 数据库连接JDBC
+## execute 基础方法
+
+```
+public <T> T execute(PreparedStatementCreator psc, PreparedStatementCallback<T> action)
+			throws DataAccessException {
+	//获取数据库连接
+	Connection con = DataSourceUtils.getConnection(getDataSource());
+	PreparedStatement ps = null;
+	try {
+		Connection conToUse = con;
+		if (this.nativeJdbcExtractor != null &&
+				this.nativeJdbcExtractor.isNativeConnectionNecessaryForNativePreparedStatements()) {
+			conToUse = this.nativeJdbcExtractor.getNativeConnection(con);
+		}
+		ps = psc.createPreparedStatement(conToUse);
+		//应用用户设定的参数
+		applyStatementSettings(ps);
+		PreparedStatement psToUse = ps;
+		if (this.nativeJdbcExtractor != null) {
+			psToUse = this.nativeJdbcExtractor.getNativePreparedStatement(ps);
+		}
+		//调用回调函数
+		T result = action.doInPreparedStatement(psToUse);
+		handleWarnings(ps);
+		return result;
+	}
+	catch (SQLException ex) {
+		//释放数据库连接
+		if (psc instanceof ParameterDisposer) {
+			((ParameterDisposer) psc).cleanupParameters();
+		}
+		psc = null;
+		JdbcUtils.closeStatement(ps);
+		ps = null;
+		DataSourceUtils.releaseConnection(con, getDataSource());
+		con = null;
+	}
+	finally {
+		if (psc instanceof ParameterDisposer) {
+			((ParameterDisposer) psc).cleanupParameters();
+		}
+		JdbcUtils.closeStatement(ps);
+		DataSourceUtils.releaseConnection(con, getDataSource());
+	}
+}
+```
+
+1. 获取数据库连接
+	
+	```
+	public static Connection doGetConnection(DataSource dataSource) throws SQLException {
+		ConnectionHolder conHolder = (ConnectionHolder) TransactionSynchronizationManager.getResource(dataSource);
+		if (conHolder != null && (conHolder.hasConnection() || conHolder.isSynchronizedWithTransaction())) {
+			conHolder.requested();
+			if (!conHolder.hasConnection()) {
+				conHolder.setConnection(dataSource.getConnection());
+			}
+			return conHolder.getConnection();
+		}
+		Connection con = dataSource.getConnection();
+		//当前线程支持同步
+		if (TransactionSynchronizationManager.isSynchronizationActive()) {
+			//在事务中使用同一数据库连接
+			ConnectionHolder holderToUse = conHolder;
+			if (holderToUse == null) {
+				holderToUse = new ConnectionHolder(con);
+			}
+			else {
+				holderToUse.setConnection(con);
+			}
+			//记录数据库连接
+			holderToUse.requested();
+			TransactionSynchronizationManager.registerSynchronization(
+					new ConnectionSynchronization(holderToUse, dataSource));
+			holderToUse.setSynchronizedWithTransaction(true);
+			if (holderToUse != conHolder) {
+				TransactionSynchronizationManager.bindResource(dataSource, holderToUse);
+			}
+		}
+
+		return con;
+	}
+	```
+	
+	Spring需要保证线程中的数据库操作都是使用同一个事务连接。
+	
+2. 应用用户设定的输入参数
+3. 调用回调函数
+4. 警告处理
+	
+	handleWarnings，SQLWarning 提供关于数据库访问警告信息的异常。
+	
+5. 资源释放
+
+
+# 事务
+
+<tx:annotation-driven/>
+
+
+# SpringMVC
+
+## ContextLoaderListener
+作用就是启动Web容器，自动装配ApplicationContext的配置信息，它实现了ServletContextListener接口，在web.xml配置这个监听器，启动容器时会默认执行它实现的方法，使用ServletContextListener接口，开发者能够在为客户端请求提供服务之前向ServletContext中添加任意的对象，这个对象在ServletContext启动的时候被初始化，在整个运行期间都是可见的。
+
+ServletContextListener中的核心逻辑是初始化WebApplicationContext实例，并存放至ServletContext中。
+
+## ContextLoaderListener
+
+ServletContext启动后会调用ServletContextListener的contextInitialized方法。
+
+```
+public void contextInitialized(ServletContextEvent event) {
+	this.contextLoader = createContextLoader();
+	if (this.contextLoader == null) {
+		this.contextLoader = this;
+	}
+//初始化WebApplicationContext
+this.contextLoader.initWebApplicationContext(event.getServletContext());
+}
+```
+
+```
+public WebApplicationContext initWebApplicationContext(ServletContext servletContext) {
+	//web.xml中只能存在一个ContextLoader定义
+	if (servletContext.getAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE) != null) {}
+
+		try {
+		//初始化context
+		if (this.context == null) {
+			this.context = createWebApplicationContext(servletContext);
+		}
+		if (this.context instanceof ConfigurableWebApplicationContext) {
+			ConfigurableWebApplicationContext cwac = (ConfigurableWebApplicationContext) this.context;
+		}
+//记录在ServletContext中
+servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, this.context);
+
+		ClassLoader ccl = Thread.currentThread().getContextClassLoader();
+		if (ccl == ContextLoader.class.getClassLoader()) {
+			currentContext = this.context;
+		}else if (ccl != null) {
+			currentContextPerThread.put(ccl, this.context);
+		}
+
+		return this.context;
+	}
+}
+```
+
+1. WebApplicationContext存在性的验证，配置中只允许声明一次ServletContextListener，多次声明会扰乱Spring的执行逻辑，Spring中创建WebApplicationContext实例会记录在ServletContext中方便全局调用。
+2. 创建WebApplicationContext实例 通过验证后，会将WebApplicationContext实例的工作委托给createWebApplicationContext方法。初始化过程中，程序会首先读取ContextLoader类的同目录下的ContextLoader.properties，并根据其中的配置提取将要实现WebApplicationContext接口的实现类，并根据该实现类通过反射方式进行实例的创建。
+3. 将实例记录在servletContext中。
+4. 映射当前的类加载器与创建的实例到全局变量currentContextPerThread中
+
+# DispatcherServlet
+Spring中ContextLoaderListener只是辅助功能，用于创建WebApplicationContext类型的实例，真正的逻辑实现是在DispatcherServlet中进行。DispatcherServlet是servlet接口的实现类。
+
+servlet生命周期是由servlet容器控制的，初始化，运行，销毁
+
+1. 初始化阶段：
+
+	* servlet容器加载servlet类，把servlet类的class文件中的数据读到内存中。
+	* servlet容器创建一个ServletConfig对象，包含了servlet初始化配置信息。
+	* servlet容器创建一个servlet对象。
+	* servlet容器调用servlet对象的init方法进行初始化。
+
+2. 运行阶段：当servlet容器接收到一个请求时，servlet容器会创建servletRequest和servletResponse对象，然后调用service方法处理请求。
+3. 销毁阶段：当Web应用被终止时，servlet容器会先调用servlet对象的destory方法，然后在销毁servlet对象和servletConfig对象，可在destory方法中释放资源，关闭数据库连接等。
+
+servlet由javax.servlet和javax.servlet.http包组成,javax.servlet包中定义了所有servlet类必须要实现或扩展的通用接口和类，在javax.servlet.http包中定义了采用HTTP协议的HttpServlet类。
+
+servlet被设计成请求驱动，Web容器接收到某个servlet请求时，servlet把请求封装成一个HttpServletReuqest对象，然后把对象传给service方法。
+
+## DispatcherServlet初始化
+在父类HttpServletBean中存在init方法：
+
+```
+public final void init() throws ServletException {
+	//解析init-param并封装到pvs中
+	try {
+		PropertyValues pvs = new ServletConfigPropertyValues(getServletConfig(), this.requiredProperties);
+		//将当前的Servlet类转为一个BeanWrapper，从而能够以Spring方式来对init-param的值进行注入。
+		BeanWrapper bw = PropertyAccessorFactory.forBeanPropertyAccess(this);
+		ResourceLoader resourceLoader = new ServletContextResourceLoader(getServletContext());
+		//注册自定义属性编辑器
+		bw.registerCustomEditor(Resource.class, new ResourceEditor(resourceLoader, getEnvironment()));
+		//留给子类实现
+		initBeanWrapper(bw);
+		bw.setPropertyValues(pvs, true);
+	}
+	//留给子类扩展
+	initServletBean();
+}
+```
+
+DispatcherServlet初始化主要是将当前的Servlet类转为一个BeanWrapper，从而能够以Spring方式来对init-param的值进行注入。属性：contextAttribute，contextClass，nameSpace，contextConfigLocation等。
