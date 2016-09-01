@@ -504,6 +504,173 @@ protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate d
 
 # BeanDefinition在IOC容器中的注册
 
+前面是BeanDefinition在IOC容器中的载入和解析，接着需要对BeanDefinition进行注册。
 
+BeanDefinitionReaderUtils.registerBeanDefinition(bdHolder, getReaderContext().getRegistry());
+
+在DefaultListableBeanFactory中实现了BeanDefinitionRegistry接口，这个接口的实现完成BeanDefinition向容器的注册。就是把解析得到的BeanDefinition设置到hashMap中去，如果遇到同名BeanDefinition，需要根据allowBeanDefinitionOverriding的配置来完成。
+
+```
+public void registerBeanDefinition(String beanName, BeanDefinition beanDefinition)
+			throws BeanDefinitionStoreException {
+
+	if (beanDefinition instanceof AbstractBeanDefinition) {
+		try {
+			((AbstractBeanDefinition) beanDefinition).validate();
+		}
+	}
+
+	BeanDefinition oldBeanDefinition;
+	//注册过程需要同步，保证数据的一致性
+	synchronized (this.beanDefinitionMap) {		//检查是不是有相同名字的BeanDefinition已经在IOC容器中注册了，
+		//如果有，但不允许覆盖就抛异常
+		oldBeanDefinition = this.beanDefinitionMap.get(beanName);
+		if (oldBeanDefinition != null) {
+			if (!this.allowBeanDefinitionOverriding) {}
+			else {}
+		}
+		else {
+			//正常注册BeanDefinition过程
+			this.beanDefinitionNames.add(beanName);
+			this.frozenBeanDefinitionNames = null;
+		}
+		this.beanDefinitionMap.put(beanName, beanDefinition);
+	}
+
+	if (oldBeanDefinition != null || containsSingleton(beanName)) {
+		resetBeanDefinition(beanName);
+	}
+}
+```
+
+完成了BeanDefinition的注册，就完成了容器的初始化，此时容器DefaultListableBeanFactory中已经建立起整个Bean的配置信息。
+
+# IOC容器的依赖注入
+
+依赖注入的过程是第一次向容器getBean的时候触发。但是也能通过lazy-init属性让容器完成对bean的预实例化，这也是一个完成依赖注入的过程，是在初始化的过程中完成的。
+
+AbstractBeanFactory中getBean的实现，getBean实际调用doGetBean：
+
+```
+//实际取得bean的地方，也是触发依赖注入发生的地方
+protected <T> T doGetBean(
+			final String name, final Class<T> requiredType, final Object[] args, boolean typeCheckOnly)
+			throws BeansException {
+
+	final String beanName = transformedBeanName(name);
+	Object bean;
+
+	//先从缓存中取得Bean，处理那些已经被创建过的单例模式的bean，这种bean不需要重复的创建
+	Object sharedInstance = getSingleton(beanName);
+	if (sharedInstance != null && args == null) {
+		//完成的是FactoryBean的相关处理，以取得FactoryBean的生产结果
+		bean = getObjectForBeanInstance(sharedInstance, name, beanName, null);
+	}else {
+		if (isPrototypeCurrentlyInCreation(beanName)) {
+			throw new BeanCurrentlyInCreationException(beanName);
+		}
+
+		//这里对IOC容器中的BeanDefinition是否存在进行检查，
+		//检查是否能在当前的BeanFactory中取得需要的Bean，
+		//如果当前工厂没有则到BeanFactory中去取，如果当前的双亲工厂取不到，就顺着双亲的BeanFactory链一直查找
+		BeanFactory parentBeanFactory = getParentBeanFactory();
+		if (parentBeanFactory != null && !containsBeanDefinition(beanName)) {
+			String nameToLookup = originalBeanName(name);
+			if (args != null) {
+				return (T) parentBeanFactory.getBean(nameToLookup, args);
+			}else {
+				return parentBeanFactory.getBean(nameToLookup, requiredType);
+			}
+		}
+
+		if (!typeCheckOnly) {
+			markBeanAsCreated(beanName);
+		}
+
+		try {
+			//根据bean的名字取得BeanDefinition
+			final RootBeanDefinition mbd = getMergedLocalBeanDefinition(beanName);
+			checkMergedBeanDefinition(mbd, beanName, args);
+
+			//获取当前bean的所有依赖bean，会触发getBean的递归调用，直到取到一个没有任何依赖的bean为止
+			String[] dependsOn = mbd.getDependsOn();
+			if (dependsOn != null) {
+				for (String dependsOnBean : dependsOn) {
+					getBean(dependsOnBean);
+					registerDependentBean(dependsOnBean, beanName);
+				}
+			}
+
+			// 这里通过createBean创建单例bean实例
+			if (mbd.isSingleton()) {
+				sharedInstance = getSingleton(beanName, new ObjectFactory<Object>() {
+					public Object getObject() throws BeansException {
+						try {
+							return createBean(beanName, mbd, args);
+						}catch (BeansException ex) {
+							destroySingleton(beanName);
+							throw ex;
+						}
+					}
+				});
+				bean = getObjectForBeanInstance(sharedInstance, name, beanName, mbd);
+			}
+			//创建原型bean
+			else if (mbd.isPrototype()) {
+				// It's a prototype -> create a new instance.
+				Object prototypeInstance = null;
+				try {
+					beforePrototypeCreation(beanName);
+					prototypeInstance = createBean(beanName, mbd, args);
+				}
+				finally {
+					afterPrototypeCreation(beanName);
+				}
+				bean = getObjectForBeanInstance(prototypeInstance, name, beanName, mbd);
+			}
+
+			else {
+				String scopeName = mbd.getScope();
+				final Scope scope = this.scopes.get(scopeName);
+				if (scope == null) {
+					throw new IllegalStateException("No Scope registered for scope '" + scopeName + "'");
+				}
+				try {
+					Object scopedInstance = scope.get(beanName, new ObjectFactory<Object>() {
+						public Object getObject() throws BeansException {
+							beforePrototypeCreation(beanName);
+							try {
+								return createBean(beanName, mbd, args);
+							}
+							finally {
+								afterPrototypeCreation(beanName);
+							}
+						}
+					});
+					bean = getObjectForBeanInstance(scopedInstance, name, beanName, mbd);
+				}
+			}
+		}catch (BeansException ex) {
+			cleanupAfterBeanCreationFailure(beanName);
+			throw ex;
+		}
+	}
+
+	//对创建的bean进行类型检查，没问题就返回新创建的bean，这个bean已经包含依赖关系
+	if (requiredType != null && bean != null && !requiredType.isAssignableFrom(bean.getClass())) {
+		try {
+			return getTypeConverter().convertIfNecessary(bean, requiredType);
+		}
+		catch (TypeMismatchException ex) {
+			if (logger.isDebugEnabled()) {
+				logger.debug("Failed to convert bean '" + name + "' to required type [" +
+						ClassUtils.getQualifiedName(requiredType) + "]", ex);
+			}
+			throw new BeanNotOfRequiredTypeException(name, requiredType, bean.getClass());
+		}
+	}
+	return (T) bean;
+}
+```
 
 
