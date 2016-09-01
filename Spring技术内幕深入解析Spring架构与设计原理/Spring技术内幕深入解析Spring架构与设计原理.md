@@ -210,4 +210,299 @@ public class FileSystemXmlApplicationContext extends AbstractXmlApplicationConte
 }
 ```
 
+```
+protected final void refreshBeanFactory() throws BeansException {
+	//如果已建立BeanFactory，则销毁并关闭该BeanFactory
+	if (hasBeanFactory()) {
+		destroyBeans();
+		closeBeanFactory();
+	}
+	//这里创建并设置持有的DefaultListableBeanFactory的地方
+	//同时调用loadBeanDefinitions再载入BeanDefinition的信息
+	try {
+		DefaultListableBeanFactory beanFactory = createBeanFactory();
+		beanFactory.setSerializationId(getId());
+		customizeBeanFactory(beanFactory);
+		loadBeanDefinitions(beanFactory);
+		synchronized (this.beanFactoryMonitor) {
+			this.beanFactory = beanFactory;
+		}
+	}
+}
+```
+
+
+```
+//这是在上下文中创建DefaultListableBeanFactory的地方
+//getInternalParentBeanFactory的具体实现可以参考AbstractApplicationContext中的实现，会根据容器已有的双亲IOC容器来生成DefaultListableBeanFactory的双亲IOC容器
+protected DefaultListableBeanFactory createBeanFactory() {
+	return new DefaultListableBeanFactory(getInternalParentBeanFactory());
+}
+```
+
+loadBeanDefinitions：
+
+是使用BeanDefinitionReader载入bean定义的地方
+
+```
+public int loadBeanDefinitions(String location, Set<Resource> actualResources) throws BeanDefinitionStoreException {
+	//获取resourceLoader，使用的是DefaultResourceLoader
+	ResourceLoader resourceLoader = getResourceLoader();
+	//解析Resource路径模式
+	//比如我们设定的各种Ant格式的路径定义，得到需要的Resource集合
+	//这些Resource集合指向我们已经定义好的BeanDefinition信息，可以是多个文件
+	if (resourceLoader instanceof ResourcePatternResolver) {
+		try {
+			//调用DefaultResourceLoader的getResource完成具体的resource定位
+			Resource[] resources = ((ResourcePatternResolver) resourceLoader).getResources(location);
+			int loadCount = loadBeanDefinitions(resources);
+			if (actualResources != null) {
+				for (Resource resource : resources) {
+					actualResources.add(resource);
+				}
+			}
+			return loadCount;
+		}
+	}
+	else {
+		//调用DefaultResourceLoader的getResource完成具体的resource定位
+		Resource resource = resourceLoader.getResource(location);
+		int loadCount = loadBeanDefinitions(resource);
+		if (actualResources != null) {
+			actualResources.add(resource);
+		}
+		return loadCount;
+	}
+}
+```
+
+getResource：
+
+DefaultResourceLoader
+
+
+```
+public Resource getResource(String location) {
+	//处理带有classpath标识的resource
+	if (location.startsWith(CLASSPATH_URL_PREFIX)) {
+		return new ClassPathResource(location.substring(CLASSPATH_URL_PREFIX.length()), getClassLoader());
+	}
+	else {
+		try {
+			//处理带URL的resource定位
+			URL url = new URL(location);
+			return new UrlResource(url);
+		}
+		catch (MalformedURLException ex) {
+			//既不是ClassPath也不是url的，把getResource任务交给getResourceByPath，默认的实现是得到一个ClassPathContextResource，由子类来实现
+			return getResourceByPath(location);
+		}
+	}
+}
+```
+
+FileSystemXmlApplicationContext实现了getResourceByPath。
+
+# BeanDefinition的载入和解析
+
+对IOC容器来说，载入过程相当于把定义的BeanDefinition在IOC容器中转化成一个Spring内部表示的数据结构的过程。BeanDefinition通过HashMap来保持和维护。
+
+refresh方法：描述了整个ApplicationContext的初始化过程。
+
+```
+public void refresh() throws BeansException, IllegalStateException {
+	synchronized (this.startupShutdownMonitor) {
+		prepareRefresh();
+
+		//这是在子类中启动refreshBeanFactory的地方
+		ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
+
+		// Prepare the bean factory for use in this context.
+		prepareBeanFactory(beanFactory);
+
+		try {
+			//设置BeanFactory的后置处理
+			postProcessBeanFactory(beanFactory);
+
+			//调用BeanFactory的后处理器，这些后处理器是在Bean定义中向容器注册的
+			invokeBeanFactoryPostProcessors(beanFactory);
+
+			//注册bean的后处理器，在bean创建过程中调用
+			registerBeanPostProcessors(beanFactory);
+
+			//对上下文中的消息源进行初始化
+			initMessageSource();
+
+			//对上下文中的事件机制进行初始化
+			initApplicationEventMulticaster();
+
+			//初始化其他特殊bean
+			onRefresh();
+
+			//检查监听bean，并将这些bean向容器注册
+			registerListeners();
+
+			// 实例化所有的 (non-lazy-init)单例.
+			finishBeanFactoryInitialization(beanFactory);
+
+			// 发布容器事件，结束refres过程
+			finishRefresh();
+		}catch (BeansException ex) {
+			//销毁前面过程生成的单例bean
+			destroyBeans();
+			// 重置active标志
+			cancelRefresh(ex);
+		}
+	}
+}
+```
+
+在AbstractRefreshableApplicationContext的refreshBeanFactory方法中，创建了BeanFactory，在创建容器之前，如果已有容器存在，需要把已有容器销毁和关闭。在建立好当前的IOC容器以后，开始对容器的初始化过程，比如BeanDefinition的载入。
+
+loadBeanDefinitions抽象方法，实际在AbstractXmlApplicationContext中实现，在这个loadBeanDefinitions中初始化读取器XMLBeanDefinitionReader，然后把这个读取器在ioc容器中设置好，最后启动读取器来完成BeanDefinition的载入
+
+```
+protected void loadBeanDefinitions(DefaultListableBeanFactory beanFactory) throws BeansException, IOException {
+	//创建XmlBeanDefinitionReader，并通过回调设置到BeanFactory中去
+	//使用的是DefaultListableBeanFactory
+	XmlBeanDefinitionReader beanDefinitionReader = new XmlBeanDefinitionReader(beanFactory);
+beanDefinitionReader.setEnvironment(this.getEnvironment());
+	//这里设置XmlBeanDefinitionReader，为XmlBeanDefinitionReader配置ResourceLoader，因为DefaultResourceLoader是父类，所以this可以直接被使用
+	beanDefinitionReader.setResourceLoader(this);
+	beanDefinitionReader.setEntityResolver(new ResourceEntityResolver(this));
+
+	//启动bean定义信息载入过程
+	initBeanDefinitionReader(beanDefinitionReader);
+	loadBeanDefinitions(beanDefinitionReader);
+}
+```
+
+接着调用loadBeanDefinitions，首先得到BeanDefinition信息的Resource定位，然后调用XmlBeanDefinitionReader来读取，具体载入过程是委托给BeanDefinitionReader完成。
+
+```
+protected void loadBeanDefinitions(XmlBeanDefinitionReader reader) throws BeansException, IOException {
+	Resource[] configResources = getConfigResources();
+	if (configResources != null) {
+		reader.loadBeanDefinitions(configResources);
+	}
+	String[] configLocations = getConfigLocations();
+	if (configLocations != null) {
+		reader.loadBeanDefinitions(configLocations);
+	}
+}
+```
+
+初始化FileSystemXmlApplicationContext的过程是通过调用IOC的refresh来启动BeanDefinition的载入过程，初始化是通过定义的XmlBeanDefinitionReader来完成。
+
+具体的Resource载入在XmlBeanDefinitionReader读入BeanDefinition时实现。
+
+```
+public int loadBeanDefinitions(Resource... resources) throws BeanDefinitionStoreException {
+	//载入BeanDefinition的过程会遍历整个Resource集合所包含的BeanDefinition信息
+	int counter = 0;
+	for (Resource resource : resources) {
+		counter += loadBeanDefinitions(resource);
+	}
+	return counter;
+}
+```
+
+loadBeanDefinitions：在读取器中需要得到XMl的resource，得到xml之后，就可以解析了，解析交给了BeanDefinitionParserDelegate来完成。
+
+```
+public int loadBeanDefinitions(EncodedResource encodedResource) throws BeanDefinitionStoreException {
+
+	Set<EncodedResource> currentResources = this.resourcesCurrentlyBeingLoaded.get();
+	if (currentResources == null) {
+		currentResources = new HashSet<EncodedResource>(4);
+		this.resourcesCurrentlyBeingLoaded.set(currentResources);
+	}
+	if (!currentResources.add(encodedResource)) {}
+	//这里得到xml文件，并得到IO的InputSource准备进行读取
+	try {
+		InputStream inputStream = encodedResource.getResource().getInputStream();
+		try {
+			InputSource inputSource = new InputSource(inputStream);
+			if (encodedResource.getEncoding() != null) {
+				inputSource.setEncoding(encodedResource.getEncoding());
+			}
+			return doLoadBeanDefinitions(inputSource, encodedResource.getResource());
+		}
+		
+	}
+}
+```
+
+具体的读取过程在doLoadBeanDefinitions方法中，从特定的xml文件中实际载入BeanDefinition的地方：
+
+```
+protected int doLoadBeanDefinitions(InputSource inputSource, Resource resource)
+			throws BeanDefinitionStoreException {
+	try {
+		int validationMode = getValidationModeForResource(resource);
+		//取得xml文件的Document对象，解析过程是由documentLoader（DefaultDocumentLoader）完成的
+		Document doc = this.documentLoader.loadDocument(
+				inputSource, getEntityResolver(), this.errorHandler, validationMode, isNamespaceAware());
+		//启动对BeanDefinition解析的详细过程，这个解析会使用到Spring的Bean配置规则
+		return registerBeanDefinitions(doc, resource);
+	}
+}
+```
+
+registerBeanDefinitions 按照Spring的Bean语义要求进行解析并转化为容器内部数据结构。
+
+```
+public int registerBeanDefinitions(Document doc, Resource resource) throws BeanDefinitionStoreException {
+	//创建BeanDefinitionDocumentReader来对xml的BeanDefinition进行解析
+	BeanDefinitionDocumentReader documentReader = createBeanDefinitionDocumentReader();
+	documentReader.setEnvironment(getEnvironment());
+	int countBefore = getRegistry().getBeanDefinitionCount();
+	//具体解析过程在registerBeanDefinitions中完成
+	documentReader.registerBeanDefinitions(doc, createReaderContext(resource));
+	return getRegistry().getBeanDefinitionCount() - countBefore;
+}
+```
+
+创建BeanDefinitionDocumentReader：
+
+```
+protected BeanDefinitionDocumentReader createBeanDefinitionDocumentReader() {
+	return BeanDefinitionDocumentReader.class.cast(BeanUtils.instantiateClass(this.documentReaderClass));
+}
+```
+
+得到reader之后，具体解析过程：`registerBeanDefinitions->doRegisterBeanDefinitions->parseBeanDefinitions->parseDefaultElement->processBeanDefinition`
+BeanDefinitionParserDelegate来解析：
+
+```
+protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {
+	//封装了BeanDefinition，Bean的名字和别名，来完成向ioc容器注册
+	//得到这个holder意味着对xml的解析是按照spring的bean规则进行解析得到的
+	BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
+	if (bdHolder != null) {
+		bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
+		try {
+			//这里是向容器注册解析得到的BeanDefinition的地方
+			BeanDefinitionReaderUtils.registerBeanDefinition(bdHolder, getReaderContext().getRegistry());
+		}
+		//注册以后，发送消息
+		getReaderContext().fireComponentRegistered(new BeanComponentDefinition(bdHolder));
+	}
+}
+```
+
+具体BeanDefinition解析是在BeanDefinitionParserDelegate中完成的，这个类包含了对bean定义规则的处理。
+
+其他元素的解析，比如各种bean属性的配置，是由parseBeanDefinitionElement来完成。
+
+上面是BeanDefinition依据xml的<bean>定义被创建的过程。
+
+![](AbstractBeanDefinition.png)
+这个BeanDefinition可以看成是对<bean>的抽象。
+
+
+# BeanDefinition在IOC容器中的注册
+
+
+
 
