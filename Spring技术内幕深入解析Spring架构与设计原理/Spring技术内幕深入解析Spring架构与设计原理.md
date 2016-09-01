@@ -495,10 +495,11 @@ protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate d
 
 其他元素的解析，比如各种bean属性的配置，是由parseBeanDefinitionElement来完成。
 
-上面是BeanDefinition依据xml的<bean>定义被创建的过程。
+上面是BeanDefinition依据xml的`<bean>`定义被创建的过程。
 
 ![](AbstractBeanDefinition.png)
-这个BeanDefinition可以看成是对<bean>的抽象。
+
+这个BeanDefinition可以看成是对`<bean>`的抽象。
 
 
 # BeanDefinition在IOC容器中的注册
