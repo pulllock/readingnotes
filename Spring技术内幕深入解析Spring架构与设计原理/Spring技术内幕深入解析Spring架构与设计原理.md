@@ -673,4 +673,301 @@ protected <T> T doGetBean(
 }
 ```
 
+getBean是依赖注入的起点，之后会调用createBean。
+
+```
+protected Object createBean(final String beanName, final RootBeanDefinition mbd, final Object[] args)
+			throws BeanCreationException {
+	//判断需要创建的bean是否可以被实例化，这个类是否可以通过类装载器来载入
+	resolveBeanClass(mbd, beanName);
+	try {
+		mbd.prepareMethodOverrides();
+	}
+	try {
+		//如果bean配置了PostProcessor，这里返回的是一个代理
+		Object bean = resolveBeforeInstantiation(beanName, mbd);
+		if (bean != null) {
+			return bean;
+		}
+	}
+	//创建bean的调用
+	Object beanInstance = doCreateBean(beanName, mbd, args);
+	return beanInstance;
+}
+```
+
+```
+protected Object doCreateBean(final String beanName, final RootBeanDefinition mbd, final Object[] args) {
+	//这个BeanWrapper是用来持有创建出来的Bean对象的
+	BeanWrapper instanceWrapper = null;
+	//如果是单例，先把缓存中的同名bean清除
+	if (mbd.isSingleton()) {
+		instanceWrapper = this.factoryBeanInstanceCache.remove(beanName);
+	}
+	//创建bean实例
+	if (instanceWrapper == null) {
+		instanceWrapper = createBeanInstance(beanName, mbd, args);
+	}
+	final Object bean = (instanceWrapper != null ? instanceWrapper.getWrappedInstance() : null);
+	Class<?> beanType = (instanceWrapper != null ? instanceWrapper.getWrappedClass() : null);
+	synchronized (mbd.postProcessingLock) {
+		if (!mbd.postProcessed) {
+			applyMergedBeanDefinitionPostProcessors(mbd, beanType, beanName);
+			mbd.postProcessed = true;
+		}
+	}
+	boolean earlySingletonExposure = (mbd.isSingleton() && this.allowCircularReferences &&
+			isSingletonCurrentlyInCreation(beanName));
+	if (earlySingletonExposure) {
+		addSingletonFactory(beanName, new ObjectFactory<Object>() {
+			public Object getObject() throws BeansException {
+				return getEarlyBeanReference(beanName, mbd, bean);
+			}
+		});
+	}
+
+	//这里是对bean的初始化，依赖注入在这里发生，
+	//exposedObject在初始化处理完以后会返回作为依赖注入完成之后的bean
+	Object exposedObject = bean;
+	try {
+		populateBean(beanName, mbd, instanceWrapper);
+		if (exposedObject != null) {
+			exposedObject = initializeBean(beanName, exposedObject, mbd);
+		}
+	}
+
+	if (earlySingletonExposure) {
+		Object earlySingletonReference = getSingleton(beanName, false);
+		if (earlySingletonReference != null) {
+			if (exposedObject == bean) {
+				exposedObject = earlySingletonReference;
+			}
+			else if (!this.allowRawInjectionDespiteWrapping && hasDependentBean(beanName)) {
+				String[] dependentBeans = getDependentBeans(beanName);
+				Set<String> actualDependentBeans = new LinkedHashSet<String>(dependentBeans.length);
+				for (String dependentBean : dependentBeans) {
+					if (!removeSingletonIfCreatedForTypeCheckOnly(dependentBean)) {
+						actualDependentBeans.add(dependentBean);
+					}
+				}
+				if (!actualDependentBeans.isEmpty()) {
+					throw new BeanCurrentlyInCreationException();
+				}
+			}
+		}
+	}
+	try {
+		registerDisposableBeanIfNecessary(beanName, bean, mbd);
+	}
+
+	return exposedObject;
+}
+
+```
+
+与依赖注入关系密切的方法有createBeanInstance和populateBean。
+
+在createBeanInstance中生成了bean所包含的java对象。
+
+```
+protected BeanWrapper createBeanInstance(String beanName, RootBeanDefinition mbd, Object[] args) {
+	//确认需要创建的bean实例的类可以被实例化
+	Class<?> beanClass = resolveBeanClass(mbd, beanName);
+
+	if (beanClass != null && !Modifier.isPublic(beanClass.getModifiers()) && !mbd.isNonPublicAccessAllowed()) {
+		throw new BeanCreationException();
+	}
+	//使用工厂方法对bean进行实例化
+	if (mbd.getFactoryMethodName() != null)  {
+		return instantiateUsingFactoryMethod(beanName, mbd, args);
+	}
+
+	// Shortcut when re-creating the same bean...
+	boolean resolved = false;
+	boolean autowireNecessary = false;
+	if (args == null) {
+		synchronized (mbd.constructorArgumentLock) {
+			if (mbd.resolvedConstructorOrFactoryMethod != null) {
+				resolved = true;
+				autowireNecessary = mbd.constructorArgumentsResolved;
+			}
+		}
+	}
+	if (resolved) {
+		if (autowireNecessary) {
+			return autowireConstructor(beanName, mbd, null, null);
+		}
+		else {
+			return instantiateBean(beanName, mbd);
+		}
+	}
+
+	//使用构造函数进行实例化
+	Constructor<?>[] ctors = determineConstructorsFromBeanPostProcessors(beanClass, beanName);
+	if (ctors != null ||
+			mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_CONSTRUCTOR ||
+			mbd.hasConstructorArgumentValues() || !ObjectUtils.isEmpty(args))  {
+		return autowireConstructor(beanName, mbd, ctors, args);
+	}
+
+	//使用默认构造函数进行实例化
+	return instantiateBean(beanName, mbd);
+}
+
+//最常见的实例化过程
+protected BeanWrapper instantiateBean(final String beanName, final RootBeanDefinition mbd) {
+	//使用默认的实例化策略对bean进行实例化
+	//默认的实例化策略是CglibSubclassingInstantiationStrategy
+	//使用Cglib来对bean进行实例化
+	try {
+		Object beanInstance;
+		final BeanFactory parent = this;
+		if (System.getSecurityManager() != null) {
+			beanInstance = AccessController.doPrivileged(new PrivilegedAction<Object>() {
+				public Object run() {
+					return getInstantiationStrategy().instantiate(mbd, beanName, parent);
+				}
+			}, getAccessControlContext());
+		}
+		else {
+			beanInstance = getInstantiationStrategy().instantiate(mbd, beanName, parent);
+		}
+		BeanWrapper bw = new BeanWrapperImpl(beanInstance);
+		initBeanWrapper(bw);
+		return bw;
+	}
+}
+```
+
+Cglib来生成bean对象，SimpleInstantiationStrategy，提供两种方法实例化，一种是BeanUtils使用jvm反射，一种是cglib：
+
+```
+public Object instantiate(RootBeanDefinition beanDefinition, String beanName, BeanFactory owner) {
+	if (beanDefinition.getMethodOverrides().isEmpty()) {
+		//取得指定的构造函数或生成对象的工厂方法来对bean进行实例化
+		Constructor<?> constructorToUse;
+		synchronized (beanDefinition.constructorArgumentLock) {
+			constructorToUse = (Constructor<?>) beanDefinition.resolvedConstructorOrFactoryMethod;
+			if (constructorToUse == null) {
+				final Class<?> clazz = beanDefinition.getBeanClass();
+				if (clazz.isInterface()) {
+					throw new BeanInstantiationException();
+				}
+				try {
+					if (System.getSecurityManager() != null) {
+						constructorToUse = AccessController.doPrivileged(new PrivilegedExceptionAction<Constructor>() {
+							public Constructor<?> run() throws Exception {
+								return clazz.getDeclaredConstructor((Class[]) null);
+							}
+						});
+					}
+					else {
+						constructorToUse =	clazz.getDeclaredConstructor((Class[]) null);
+					}
+					beanDefinition.resolvedConstructorOrFactoryMethod = constructorToUse;
+				}
+			}
+		}
+		//通过BeanUtils进行实例化
+		return BeanUtils.instantiateClass(constructorToUse);
+	}
+	else {
+		//使用cglib进行实例化
+		return instantiateWithMethodInjection(beanDefinition, beanName, owner);
+	}
+}
+```
+bean对象生成后，怎样把bean对象的依赖关系设置好，完成这个依赖注入过程需要查看下面populateBean：
+
+populateBean：
+
+```
+protected void populateBean(String beanName, RootBeanDefinition mbd, BeanWrapper bw) {
+	//取得在BeanDefinition中设置的property值，这些property来自对BeanDefinition的解析
+	PropertyValues pvs = mbd.getPropertyValues();
+
+	//开始进行依赖注入，先处理autowire的注入
+	if (mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_NAME ||
+			mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_TYPE) {
+		MutablePropertyValues newPvs = new MutablePropertyValues(pvs);
+		if (mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_NAME) {
+			autowireByName(beanName, mbd, bw, newPvs);
+		}
+		if (mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_TYPE) {
+			autowireByType(beanName, mbd, bw, newPvs);
+		}
+
+		pvs = newPvs;
+	}
+	//对属性进行注入
+	applyPropertyValues(beanName, mbd, bw, pvs);
+}
+
+//通过applyPropertyValues了解具体的对属性进行解析然后注入的过程
+protected void applyPropertyValues(String beanName, BeanDefinition mbd, BeanWrapper bw, PropertyValues pvs) {
+	
+	BeanDefinitionValueResolver valueResolver = new BeanDefinitionValueResolver(this, beanName, mbd, converter);
+
+	// Create a deep copy, resolving any references for values.
+	List<PropertyValue> deepCopy = new ArrayList<PropertyValue>(original.size());
+	boolean resolveNecessary = false;
+	for (PropertyValue pv : original) {
+		if (pv.isConverted()) {
+			deepCopy.add(pv);
+		}
+		else {
+			String propertyName = pv.getName();
+			Object originalValue = pv.getValue();
+			Object resolvedValue = valueResolver.resolveValueIfNecessary(pv, originalValue);
+			Object convertedValue = resolvedValue;
+			boolean convertible = bw.isWritableProperty(propertyName) &&
+					!PropertyAccessorUtils.isNestedOrIndexedProperty(propertyName);
+			if (convertible) {
+				convertedValue = convertForProperty(resolvedValue, propertyName, bw, converter);
+			}
+			if (resolvedValue == originalValue) {
+				if (convertible) {
+					pv.setConvertedValue(convertedValue);
+				}
+				deepCopy.add(pv);
+			}
+			else if (convertible && originalValue instanceof TypedStringValue &&
+					!((TypedStringValue) originalValue).isDynamic() &&
+					!(convertedValue instanceof Collection || ObjectUtils.isArray(convertedValue))) {
+				pv.setConvertedValue(convertedValue);
+				deepCopy.add(pv);
+			}
+			else {
+				resolveNecessary = true;
+				deepCopy.add(new PropertyValue(pv, convertedValue));
+			}
+		}
+	}
+	if (mpvs != null && !resolveNecessary) {
+		mpvs.setConverted();
+	}
+
+	//依赖注入发生的地方，会在BeanWrapperImpl中完成
+	try {
+		bw.setPropertyValues(new MutablePropertyValues(deepCopy));
+	}
+}
+```
+
+通过使用BeanDefinitionResolver来对BeanDefinition进行解析，然后注入到property中，BeanDefinitionValueResolver中看下解析过程：
+
+
+完成解析之后，已经为依赖注入准备好了条件，这是真正把Bean对象设置到它所依赖的另一个bean的属性中去的地方。依赖注入的发生是在BeanWrapper的setPropertyValues中，具体实现是在BeanWrapper子类BeanWrapperImpl中实现。
+
+
+# 容器其他相关特性的设计与实现
+
+IOC容器中Bean的生命周期：
+
+* Bean实例的创建
+* 为Bean实例设置属性
+* 调用Bean的初始化方法
+* 应用可通过ioc容器使用bean
+* 容器关闭时，调用bean的销毁方法
+
 
