@@ -76,6 +76,72 @@ sleep(long millis);
 sleep(long millis,int nanos)
 ```
 
+# 单例模式
+
+## 饿汉模式
+
+饿汉单例模式就是将类的静态实例作为该类的一个成员变量，在jvm加载它的时候就已经创建了该类的实例，因此不会存在多线程的安全问题
+
+```
+public class SingletonTest{
+	private final static SingletonTest instance = new SingletonTest();
+	private SingletonTest(){}
+	
+	public static SingletonTest getInstance(){
+		return instance;
+	}
+}
+```
+
+不存在线程安全问题，但是存在性能上的问题，提前对实例进行了初始化。
+
+## 懒汉模式
+
+实例虽然作为该类的一个实例变量，但是不主动进行创建，只有在第一次使用的时候才会被创建。
+
+```
+public class SingletonTest{
+	private static SingletonTest instance = null;
+	
+	private SingletonTest(){}
+	
+	public static SingletonTest getInstance(){
+		if(null == instance){
+			instance = new SingletonTest();
+		}
+		return instance;
+	}
+}
+```
+存在线程安全问题，可以使用`synchronized`关键字：
+
+```
+public synchronized static SingletonTest getInstance(){
+	if(null == instance){
+		instance = new SingletonTest();
+	}
+	return instance;
+}
+```
+
+这样做的话效率是相当低的，每次调用都要获取锁。可进行如下改进：
+
+```
+public static SingletonTest getInstance(){
+	if(null == instance){
+		synchronized(SingletonTest.class){
+			if(null == instance){
+				instance = new SingletonTest();
+			}
+		}
+	}
+	return instance;
+}
+```
+
+# 死锁
+
+
 
 
 
