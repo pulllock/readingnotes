@@ -141,9 +141,77 @@ public static SingletonTest getInstance(){
 
 # 死锁
 
+# 线程间的通讯
+## 生产者消费者
+## 多线程下的生产者消费者模式
+
+# Object类wait，notify，notifyAll详解
+
+## wait
+wait和sleep一样是放弃cpu执行权，但是wait需要等待另外一个持有相同锁的线程对其进行唤醒操作，并且wait方法必须有一个同步锁，否则抛异常`java.lang.IllegalMonitorStateException: current thread
+not owner`。
+
+## notify
+是将之前处在临时状态的线程唤醒，并且获取执行权，等待cpu再次调度，必须和之前的wait方法用到的是同一个锁。
+
+## notifyAll
+notify是唤醒一个正处在阻塞状态的线程，在Jvm中存在一个线程队列或者线程池的概念，notify将严格按照FIFO的方式唤醒在队列中与自己保持有同样一把锁的线程。
+
+notifyAll是将所有wait中的线程都进行唤醒，唤醒的线程保持有和自己一样的锁。
+
+# 守护线程与线程的优先级
+
+## 守护线程
+一个后台线程，主线程一旦结束，他就会随之结束。
+
+设置守护线程`setDaemon(true)`
+
+## 线程的yield
+yield方法是短暂放弃CPU执行权。
+
+## 线程的停止
+之前调用stop方法可以停止，但是该方法已经被废弃，存在线程安全问题。
+
+- run方法中的业务逻辑执行完毕
+- 死循环退出
+
+## 线程的优先级
+
+线程的优先级别高，就是获得CPU执行权的几率高。
+
+`void setPriority(int newPriority)`
+
+## join
+
+临时加入一个线程，等到改线程执行结束后才能运行主线程。
+
+## interrupt
+将处在阻塞中的线程打断，也就是将线程从阻塞状态转换到临时状态或者其他状态，执行该方法会抛出一个异常InterruptedException。
 
 
+# 线程池的实现
 
+线程的销毁和创建是比较耗资源的。
+
+## 线程组
+
+```
+//创建一个线程组
+public ThreadGroup(String name) {
+	this(Thread.currentThread().getThreadGroup(), name);
+}
+
+//把一个线程组当做参数，创建一个线程组。被传递的是父线程组
+public ThreadGroup(ThreadGroup parent, String name) {
+        this(checkParentAccess(parent), parent, name);
+ }
+ 
+ int activeCount() 返回此线程组中活动线程的计数。
+ 
+ int activeGroupCount 返回此线程组中活动的线程组的计数
+```
+
+# 线程状态的监控
 
 
 
