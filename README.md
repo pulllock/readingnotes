@@ -21,13 +21,15 @@
 
 ## Java多线程编程核心技术
 
+## Java RESTful Web Service 实战
+
 # 被推荐的书
 
 - Java编程思想
 - 大规模Java平台虚拟化与调优
 - Java核心技术 卷I 卷II
 - Java 虚拟机规范
-- JavaRESTful Web Service实战
+- ~~JavaRESTful Web Service实战~~
 - Java EE 7 权威指南 卷I
 - Java应用架构设计
 - Java 7 程序设计
