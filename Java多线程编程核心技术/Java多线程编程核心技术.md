@@ -163,6 +163,109 @@ Object类中的notifyAll方法相当于Condition类的signalAll方法。
 
 公平锁表示线程获取的顺序是按照线程加锁的顺序来分配的，FIFO。非公平锁是一种获取锁的抢占机制，是随机获得的。
 
+- getHoldCount()查询当前线程保持此锁定的个数，也就是调用lock方法的次数。
+- int getQueueLength()返回正等待获取此锁定的线程估计数。
+- int getWaitQueueLength(Condition condition)返回等待与此锁定相关的给定条件Condition的线程估计数。
+- boolean hasQueueThread(Thread thread)查询指定到额线程是否是正在等待获取此锁定。
+- boolean hasWaiters(Condition condition)查询是否有线程正在等待与此锁定有关的condition条件。
+- isFair()判断是不是公平锁。
+- isHeldByCurrentThread() 查询当前线程是否保持此锁定。
+- isLocked()查询此锁定是否由任意线程保持。
+- lockInterruptibly()如果当前线程未被中断，则获取锁定，如果已被中断则抛出异常。
+- tryLock() 仅在调用时锁定未被另外一个线程保持的情况下，才获取该锁定。
+- tryLock(long timeout,TimeUnit unit)如果锁定在给定等待时间内没有被另外一个线程保持，且当前线程未被中断，则获取该锁定。
+- awaitUninterruptibly()
+- awaitUntil()
+
+## ReentrantReadWriteLock
+RerntrantLock具有完全互斥排他效果，同一时间只有一个线程在执行lock后面的任务。
+
+ReentrantReadWriteLock 读写锁，有两个锁，一个是读操作相关的锁，称为共享锁；另一个是写操作相关的锁，叫排它锁。多个读锁之间不互斥，读锁写锁互斥，写锁写锁互斥。多个Thread可以同时进行读取操作，同一时刻只允许一个Thread进行写入操作。
+
+# 定时器Timer
+Timer类主要负责计划任务功能，封装任务的类是TimerTask。
+
+- schedule(TimerTask task,Date time) 指定的日期执行一次任务。
+- schedule(Timer task,Date firstTime,long period) 指定的日期之后按照指定的间隔周期性的循环执行任务。
+- TimerTask类的 cancel()方法将自身从任务队列中清除。
+- Timer类的cancel()方法是将任务队列中的全部任务清空。
+
+# 单例模式与多线程
+
+## 饿汉模式
+方法调用之前，实例已经被创建。
+
+```
+public class MyObject{
+	private static MyObject object = new MyObject();
+	
+	private MyObject(){}
+	public static MyObject getInstance(){
+		return object;
+	}
+}
+```
+
+## 懒汉模式
+在调用方法时实例才被创建。
+
+```
+public class MyObject{
+	private MyObject object = null;
+	
+	private MyObject(){}
+	
+	public static MyObject getInstance(){
+		if(object == null){
+			sycnhronized(MyObject.class){
+				if(object == null){
+					object = new MyObject();
+				}
+			}
+			
+		}
+		return object;
+	}
+}
+```
+
+## 使用静态内部类实现单例模式
+
+```
+public class MyObject{
+	private static class MyObjectHandler{
+		private static MyObject myObject = new MyObject();
+	}
+	private MyObject(){}
+	
+	public static MyObject getInstance(){
+		return MyObjectHandler.myObject;
+	}
+}
+```
+
+## 使用static代码块实现单例模式
+
+```
+public class MyObject{
+	private static MyObject instance = null;
+	private MyObject(){}
+	
+	static{
+		instance = new MyObject();
+	}
+	
+	public static MyObject getInstance(){
+	 return instance;
+	}
+}
+```
+
+## 使用enum美剧数据类型实现单例模式
+枚举enum和静态代码块的特性相似，使用枚举类时，构造方法会被自动调用。
+
+
+## SImpleDateFormat 非线程安全
 
 
 
