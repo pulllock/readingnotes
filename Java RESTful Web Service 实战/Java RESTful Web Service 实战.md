@@ -64,8 +64,62 @@ REST使用URI实现资源定位。
 
 @DefaultValue 提供默认值。
 
+### @BeanParam
+用于自定义参数组合。
+
+### @CookieParam
+匹配Cookie中的键值对信息。
+
+### @Context
+解析上下文参数。Application，Request，Provider，UriInfo，HttpHeaders。
+
+## Rest传输格式
+### 基本类型
+### 文件类型
+### InputStream类型
+### Reader类型
+### XML类型
+### JSON类型
 
 
+## REST内容协商
 
+### @Produces
+定义方法的响应实体的数据类型。
+
+### @Consumes
+定义方法的请求实体的数据类型。
+
+# REST请求处理
+
+## Providers
+是JAX-RS 2.0 定义的一种辅助接口，实现类用于辅助REST框架完成过滤和读写拦截功能。
+
+## 绑定机制
+@NameBinding 可以定义一个运行时的自定义注解，该注解用于定义类级别名称和类的方法名。
+
+# REST客户端
+
+# REST安全
+
+# REST推送与异步通信
+## 服务-浏览器通信
+### Polling技术
+### Comet技术
+### SSE技术
+HTML5 标准之一。
+
+### WebSocket技术
+
+## 异步通信
+
+### Polling异步通信
+
+### Web Hook异步通信
+
+### Comet异步通信
+
+### HTML5异步通信
+包含SSE和WebSocket
 
 
