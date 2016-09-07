@@ -987,3 +987,82 @@ IOC容器中Bean的生命周期：
 ### 配置ProxyFactoryBean
 ProxyFactoryBean是在SpringIOC环境中创建AOP的底层方法。Spring通过它完成了对AOP使用的封装。
 
+### ProxyFactoryBean生成AopProxy代理对象
+
+ProxyFactoryBean的getObject()方法：
+
+```
+public Object getObject() throws BeansException {
+	//初始化通知器链
+	initializeAdvisorChain();
+	//对单例和原型进行区分，生成对应的proxy
+	if (isSingleton()) {
+		return getSingletonInstance();
+	}
+	else {
+		return newPrototypeInstance();
+	}
+}
+```
+
+位Proxy代理对象配置Advisor链是在initializeAdvisorChain中完成的：
+
+```
+private synchronized void initializeAdvisorChain() throws AopConfigException, BeansException {
+	//已经被初始化过，直接返回
+	if (this.advisorChainInitialized) {
+		return;
+	}
+	if (!ObjectUtils.isEmpty(this.interceptorNames)) {
+		//这里添加Advisor链的调用，通过interceptorNames属性进行配置的。
+		for (String name : this.interceptorNames) {
+			if (name.endsWith(GLOBAL_SUFFIX)) {
+				//IOC容器中取得的通知器加入拦截器链中。
+				addGlobalAdvisor((ListableBeanFactory) this.beanFactory,
+						name.substring(0, name.length() - GLOBAL_SUFFIX.length()));
+			}
+
+			else {
+				//如果程序执行到这里，需要加入命名的连接器advice，并且需要检查这个Bean是单例还是原型的。
+				if (this.singleton || this.beanFactory.isSingleton(name)) {
+					//如果是单例，加入
+					advice = this.beanFactory.getBean(name);
+				}
+				else {
+					//原型类型的
+					advice = new PrototypePlaceholderAdvisor(name);
+				}
+				addAdvisorOnChainCreation(advice, name);
+			}
+		}
+	}
+
+	this.advisorChainInitialized = true;
+}
+```
+
+生成单例的代理对象在getSingletonInstance中完成，这个方法是ProxyFactoryBean生成AopProxy代理对象的入口。代理对象会封装对target目标对象的调用。生成过程：首先读取ProxyFactoryBean中的配置，为生成代理对象做好必要的准备，比如设置代理的方法调用接口等。
+
+Spring通过AopProxy类来具体生成代理对象。
+
+getSingletonInstance：
+
+```
+private synchronized Object getSingletonInstance() {
+	if (this.singletonInstance == null) {
+		this.targetSource = freshTargetSource();
+		if (this.autodetectInterfaces && getProxiedInterfaces().length == 0 && !isProxyTargetClass()) {
+			//根据AOP框架来判断需要代理的接口
+			Class<?> targetClass = getTargetClass();
+			//设置代理对象的接口
+			setInterfaces(ClassUtils.getAllInterfacesForClass(targetClass, this.proxyClassLoader));
+		}
+		super.setFrozen(this.freezeProxy);
+		//使用ProxyFactory来生成需要的Proxy
+		this.singletonInstance = getProxy(createAopProxy());
+	}
+	return this.singletonInstance;
+}
+```
+
+### JDK生成AOPProxy代理对象
