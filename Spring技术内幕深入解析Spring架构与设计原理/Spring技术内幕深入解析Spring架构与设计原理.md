@@ -975,3 +975,15 @@ IOC容器中Bean的生命周期：
 ### Advice通知
 定义在连接点做什么，为切面增强提供织入接口。
 
+### Pointcut切点
+决定Advice通知应该作用于哪个连接点，也就是通过Pointcut来定义需要增强的方法的集合。
+
+###  Advisor通知器
+完成对目标方法的切面增强设计（Advice）和关注点（Pointcut）之后，需要一个对象把他们结合起来，这个就是Advisor通知器。
+
+##Spring AOP的设计与实现
+是用的核心技术是动态代理。通过JDK的动态代理，可以为任意Java对象创建代理对象。
+
+### 配置ProxyFactoryBean
+ProxyFactoryBean是在SpringIOC环境中创建AOP的底层方法。Spring通过它完成了对AOP使用的封装。
+
