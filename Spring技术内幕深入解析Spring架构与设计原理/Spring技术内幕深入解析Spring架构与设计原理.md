@@ -1066,3 +1066,17 @@ private synchronized Object getSingletonInstance() {
 ```
 
 ### JDK生成AOPProxy代理对象
+JdkDynamicAopProxy使用JDK的Proxy类来生成代理对象，生成Proxy对象之前，首先从advised对象中取得代理对象的代理接口配置，然后调用Proxy的newProxyInstance方法，最终得到对应的Proxy代理对象。生成代理对象时需要指明三个参数，一个是类装载器，一个是代理接口，另一是Proxy回调方法所在的对象，这个对象需要实现InvocationHandler接口。
+
+```
+public Object getProxy(ClassLoader classLoader) {
+	Class<?>[] proxiedInterfaces = AopProxyUtils.completeProxiedInterfaces(this.advised);
+	findDefinedEqualsAndHashCodeMethods(proxiedInterfaces);
+	//调用jdk生成Proxy的地方
+	return Proxy.newProxyInstance(classLoader, proxiedInterfaces, this);
+}
+```
+
+### CGLIB生成AopProxy代理对象
+
+## Spring AOP拦截器调用的实现
