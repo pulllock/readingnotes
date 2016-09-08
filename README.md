@@ -12,16 +12,21 @@
 ## Spring揭秘
 
 ## Spring技术内幕深入解析Spring架构与设计原理
+第一遍完
+第二遍 page 120 3.4.2 JdkDynamicAopProxy的invoke拦截
 
 ## Spring源码深度解析
 
 ## Mina用户指南
 
 ## Java多线程编程深入详解
+第一遍 完
 
 ## Java多线程编程核心技术
+第一遍 完
 
 ## Java RESTful Web Service 实战
+第一遍 完
 
 # 被推荐的书
 
