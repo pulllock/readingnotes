@@ -31,11 +31,14 @@
 ## Java Reflection
 第一遍 三 构造器
 
+## Java核心技术 卷1 基础知识 第9版
+第一遍 四 4.2.3 更改器方法与访问器方法
+
 # 被推荐的书
 
 - Java编程思想
 - 大规模Java平台虚拟化与调优
-- Java核心技术 卷I 卷II
+- ~~Java核心技术 卷I 卷II~~
 - Java 虚拟机规范
 - ~~JavaRESTful Web Service实战~~
 - Java EE 7 权威指南 卷I
