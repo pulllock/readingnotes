@@ -129,3 +129,141 @@ Field[] field = clazz.getFields();
 ```
 Annotation[] annotations = clazz.getAnnotations();
 ```
+
+# 构造器
+利用反射可以检查一个类的构造方法，可以在运行期创建一个对象。
+
+## 获取Constructor
+
+```
+Class clazz = ...
+Constructor[] constructors = clazz.getConstructors();
+```NoSuchMethodException
+返回的Constructor数组包含每一个声明为公有的（Public）构造方法。
+
+返回的构造方法的方法参数为String类型：
+
+```
+Class clazz = ...
+Construstor constructor = clazz.getContructor(new Class[]{String.class});
+```
+
+没有满足的会抛异常NoSuchMethodException。
+
+## 构造方法参数
+
+获取参数信息：
+
+```
+Constructor constructor = ...
+Class[] parameterTypes = constructor.getParameterTypes();
+```
+
+## 实例化类
+
+```
+Constructor constructor = MyObject.class.getConstructor(String.class);
+MyObject myObject = (MyObject)constructor.newInstance("arg1");
+```
+
+constructor.newInstance()方法的方法参数是一个可变参数列表，但是当你调用构造方法的时候你必须提供精确的参数，即形参与实参必须一一对应。
+
+# 变量
+可以运行期检查一个类的变量信息(成员变量)或者获取或者设置变量的值。
+
+## 获取Field对象
+
+```
+Class clazz = ...
+Field[] fields = clazz.getFields();
+```
+返回的Field对象数组包含了指定类中声明为公有的(public)的所有变量集合。
+
+获取指定的变量：
+
+```
+Class clazz = ...;
+Field field = clazz.getField("someField");//someField为变量名
+```
+
+没有找到匹配的 抛异常NoSuchFieldException。
+
+## 变量名称
+
+```
+Field field = ...
+String fieldName = field.getName();
+``
+## 变量类型
+
+```
+Field field = clazz.getField("someField");
+Object fieldType = field.getType();
+```
+# 获取设置变量值
+通过调用Field.get()或Field.set()方法，获取或者设置变量的值：
+
+```
+Class clazz = MyObject.class;
+Field field = clazz.getField("someField");
+MyObject object = new MyObject();
+Object value = field.get(object);
+
+field.set(object,value);
+```
+
+传入Field.get()/Field.set()方法的参数objet应该是拥有指定变量的类的实例。
+
+如果变量是静态变量的话(public static)那么在调用Field.get()/Field.set()方法的时候传入null做为参数而不用传递拥有该变量的类的实例。
+
+# 方法
+
+## 获取Method对象
+
+```
+Class clazz = ...;
+Method[] methods = clazz.getMethods();
+```
+返回的Method对象数组包含了指定类中声明为公有的(public)的所有变量集合。
+
+
+通过参数类型来获取指定的方法：
+
+```
+Class clazz = ...;
+Method method = clazz.getMethod("methodName",new Class[]{String.class});
+```
+
+无法找到匹配的，抛异常NoSuchMethodException。
+
+
+获取的方法没有参数，那么在调用getMethod()方法时第二个参数传入null即可
+
+```
+Class clazz = ...;
+Method method = clazz.getMethod("methodName",null);
+```
+## 方法参数以及返回类型
+获取指定方法参数：
+
+```
+Method method = ...;
+Class[] parameterTypes = method.getParameterTypes();
+```
+获取返回类型：
+
+```
+Method method = ...;
+Class returnType = method.getReturnType();
+```
+
+## 通过Method对象调用方法
+
+```
+Method method = MyObject.class.getMethod("methodName",String.class);
+Object returnValue = method.invoke(null,"value1");
+```
+传入的null参数是你要调用方法的对象，如果是一个静态方法调用的话则可以用null代替指定对象作为invoke()的参数。
+
+
+
