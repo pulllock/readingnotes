@@ -29,7 +29,7 @@
 第一遍 完
 
 ## Java Reflection
-第一遍 六 Getters and Setters
+第一遍 完
 
 ## Java核心技术 卷1 基础知识 第9版
 第一遍 5.7 反射
