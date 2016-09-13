@@ -1080,3 +1080,9 @@ public Object getProxy(ClassLoader classLoader) {
 ### CGLIB生成AopProxy代理对象
 
 ## Spring AOP拦截器调用的实现
+Spring AOP通过JDK的Proxy方式或CGLIB方式生成代理对象的时候，相关的拦截器已经配置到代理对象中去了，拦截器在代理对象中起作用的是通过对这些方法的回调来完成的。
+
+JDK的Proxy 需要通过InvocationHandler来设置拦截器回调。
+
+CGLIB 需要通过DynamicAdviseInterceptor来完成回调。
+
