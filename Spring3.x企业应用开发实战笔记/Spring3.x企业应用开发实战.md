@@ -3,6 +3,23 @@
 
 Spring支持构造函数注入和属性注入。
 
+### 类装载器
+ClassLoader
+
+类装载器是需找类的字节码文件并构造出类在JVM内部表示的对象组件。
+
+类装载器把一个类装入JVM中，需要经过以下步骤：
+
+1. 装载 查找和导入Class文件
+2. 链接 执行校验，准备，解析步骤，解析是可选择的：
+	
+	- 校验 检查载入Class文件数据的正确性
+	- 准备 给类的静态变量分配存储空间
+	- 解析 将符号引用转成直接引用
+3. 初始化 对类的静态变量，静态代码块执行初始化工作
+
+
+
 # 资源抽象接口Resource
 Resource的实现类：
 
@@ -12,6 +29,13 @@ Resource的实现类：
 * InputStreamResource InputStream资源
 * ServletContextResource 访问web容器上下文资源
 * UrlResource 封装了java.net.URL 访问URL表示的资源
+
+# 资源加载器
+Spring定义了一套资源加载的接口，并提供了实现类。
+
+ResourceLoader接口：getResource(String location)根据一个资源地址加载文件资源，仅支持带资源类型前缀的表达式，不支持Ant风格的资源路径表达式。
+
+ResourcePatternResolver扩展了ResourceLoader接口，getResource(String locationPattern)支持带资源类型前缀以及Ant风格的资源表达式。
 
 # BeanFactory
 BeanFactory最主要的方法是getBean(String beanName)，从容器中返回特定名称的Bean
