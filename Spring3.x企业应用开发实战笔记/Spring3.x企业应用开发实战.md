@@ -37,7 +37,20 @@ ResourceLoader接口：getResource(String location)根据一个资源地址加�
 
 ResourcePatternResolver扩展了ResourceLoader接口，getResource(String locationPattern)支持带资源类型前缀以及Ant风格的资源表达式。
 
+PathMatchingResourcePatternResolver 是Spring提供的标准实现类。
+
+# BeanFactory和ApplicationContext
+一般称BeanFactory为IOC容器，ApplicationContext为应用上下文。
+
+BeanFactory是Spring的基础设施，面向Spring本身，ApplicationContext面向使用Spring的开发者。
+
 # BeanFactory
+
+类的通用工厂。
+
+## BeanFactory的类体系结构
+BeanFactory有多种实现，最常用的是XmlBeanFactory。
+
 BeanFactory最主要的方法是getBean(String beanName)，从容器中返回特定名称的Bean
 
 * ListbleBeanFactory 该接口定义了访问容器中Bean基本信息的方法。
@@ -46,6 +59,16 @@ BeanFactory最主要的方法是getBean(String beanName)，从容器中返回特
 * AutowireCapableBeanFactory 定义了将容器中的Bean按某种规则进行自动装配的方法。
 * SingletonBeanRegistry 定义了允许在运行期间向容器注册单实例Bean的方法。
 * BeanDefinitionRegistry Spring配置文件中每一个Bean节点元素在Spring容器里都通过一个BeanDefinition对象表示，描述了Bean配置信息。BeanDefinitionRegistry接口提供了向容器手工注册BeanDefinition对象的方法。
+
+## 初始化BeanFactory
+XmlBeanFactory通过Resource装载Spring配置信息，并启动IOC容器，然后就可以通过BeanFactroy的getBean()方法从IOC容器中获取Bean。
+
+启动容器时并不会初始化配置文件中定义的Bean，初始化发生在第一次调用。
+
+对于单例的Bean，BeanFactory会缓存Bean实例，第二次获取bean时将直接从IOC容器的缓存中获取。
+
+DefaultSingletonBeanRegistry类中提供了一个用于缓存单实例Bean的缓存器，HashMap。
+
 
 # ApplicationContext
 由BeanFactory派生而来，提供了更多面向实际应用的功能。
