@@ -10,7 +10,7 @@
 ## Spring3.x企业应用开发实战笔记
 第一遍 完
 
-第二遍 p57 资源加载器
+第二遍 p65 WebApplicationContext初始化
 
 ## Spring揭秘
 
