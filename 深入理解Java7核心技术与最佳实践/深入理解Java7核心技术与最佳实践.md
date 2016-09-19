@@ -64,5 +64,86 @@ getFields,getField,getDeclaredFields,getDeclaredField
 
 ## 动态代理
 
+## 动态语言支持
+
+### 方法句柄
+method handler ，通过方法句柄可以直接调用该句柄所引用的底层方法。
+
+（跳过）
+### invokedynamic指令
+
+（跳过）
+
+# Java I/O
+
+## 流
+### 基本输入流
+java.io.InputStream和java.io.OutputStream。
+
+read() 读取数据过程中，对read方法的调用是阻塞的。流中没有数据可用时，对read方法的调用需要等待。
+
+close()方法关闭流，在java7中尽量通过try-with-resources语句来使用流。
+
+### 基本输出流
+
+write()方法写入数据。
+
+flush()方法强制要求OutputStream类的对象对暂时保存在内部缓冲区中的内容立即进行实际的写操作。
+
+### 过滤输入输出流
+
+DataOutputStream,DataInputStream
+
+ObjectOutputStream,ObjectInputStream
+
+FileInputStream,FileOutputStream
+
+ByteArrayInputStream,ByteArrayOutputStream
+
+PipedInputStream,PipedOutputStream
+
+### 字符流
+Reader和Writer
+
+字节流转字符流 InputStreamReader，OutputStreamWriter 需要制定字符的编码格式。
+
+从String类对象中创建 StringReader，StringWriter
+
+从字符数组中创建 CharArrayReader，CharArrayWriter
+
+BufferedReader，BufferedWriter 提供内部缓冲区的支持。
+
+## 缓冲区
+容量capacity 创建缓冲区时指定，无法创建后修改。
+
+读写限制limit 缓冲区中进行读写操作时的最大允许位置。
+
+读写位置position 当前进行读写操作时的位置
+
+clear方法 把limit设为capacity，position设为0。
+
+flip方法 会把limit设为当前position，把position设置为0。
+
+rewind position设为0。
+
+### 字节缓冲区
+ByteBuffer
+
+直接缓冲区 和非直接缓冲区
+
+### 缓冲区视图
+视图和原ByteBuffer类对象共享同样的存储空间，但是提供额外的实用功能，在试图中对数据所做的修改会反应在原始的ByteBuffer类的的对象中。
+
+slice
+
+duplicate
+
+asReadOnlyBuffer
+
+## 通道
+
+### 文件通道
+
+
 
 
