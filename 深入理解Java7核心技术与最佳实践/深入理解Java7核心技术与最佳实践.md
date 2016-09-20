@@ -144,6 +144,55 @@ asReadOnlyBuffer
 
 ### 文件通道
 
+FileChannel
+
+使用文件通道之前首先需要获取到一个FileChannel类的对象。FileChannel类的对象以即可通过直接打开文件的方式来创建，也可以从已有的流中得到。
+
+数据传输：transferFrom和transferTo
+
+内存映射文件 FileChannel的map方法可以把文件映射到内存中。通过MappedByteBuffer类的load方法可以把该缓冲区所对应的文件内容加载到物理内存中。
+
+force方法强制要求把更新同步到文件中。
+
+FileChannel类的lock和tryLock方法可以对当前文件通道所对应的文件进行加锁。可以选择锁定文件的全部内容，也可以锁定指定范围区间中的部分内容。
+
+lock阻塞，tryLock不阻塞。成功加锁后得到一个FileLock对象。release方法可以解除锁定。
+
+isShared为true表示是一个共享锁，否则是排他锁。
 
 
+### 套接字通道
+JavaNIO提供了非阻塞式和多路复用的套接字连接。
 
+NetworkChannel表示一个套接字所对应的通道。
+
+SocketChannel和ServerSocketChannel都支持阻塞和费阻塞两种模式。
+
+费阻塞式的套接字通道实现多路复用，或者使用NIO.2中的异步套接字通道。
+
+套接字通道的多路复用的思想比较简单，通过一个专门的selector来同时对多个套接字通道进行监听。基于选择器的做法可以同时管理多个套接字通道，可用通道的选择一般是通过操作系统提供的底层系统调用来实现的，性能较高。
+
+多路复用实现核心是选择器Selector类的对象，非阻塞式的套接字通道可以通过register方法注册到某个Selector类的对象上，需要提供感兴趣的事件。
+
+Selector的open方法可以创建一个新的选择器，有了选择器之后可以把套接字通道注册到选择器上。注册时需要指定套接字感兴趣的事件。
+
+套接字通道注册完成之后，下一步就是调用Selector类的对象的select方法来进行通道选择操作。
+
+## NIO.2
+
+### 文件系统访问
+Path接口作为文件系统中路径的一个抽象。
+
+getRoot 获取根 
+
+getNameCount 获取名称元素的总数
+
+getName 获取单个名称元素
+
+getFileName 获取文件名
+
+getParent 获取当前路径的父路径
+
+文件目录列表流 DirectoryStream。
+
+文件目录树遍历  FileVisitor
