@@ -193,6 +193,53 @@ getFileName 获取文件名
 
 getParent 获取当前路径的父路径
 
-文件目录列表流 DirectoryStream。
+1. 文件目录列表流 
 
-文件目录树遍历  FileVisitor
+DirectoryStream。
+
+2. 文件目录树遍历 
+
+FileVisitor
+
+3. 文件属性
+
+AttributeView是所有属性视图的父接口。
+
+FileAttributeView表示的是文件的属性视图。
+
+4. 监视目录变化
+
+NIO.2提供了新的目录监视服务，使用该服务可以在指定目录中的子目录或文件被创建，更改或删除时得到事件通知。
+
+被监事的对象要实现Watchable接口。并通过register方法注册到表示监视服务的WatchService接口的实现对象上，注册是需要指定被监视对象感兴趣的事件类型。
+
+5. 文件操作的实用方法
+
+### zip/jar文件系统
+
+### 异步IO通道
+异步通道一般提供两种使用方式：一种是通过Java同步工具包中的Future类的对象来表示异步操作的结果。另外一种是在执行操作时传入一个CompletionHandler接口的实现对象作为操作完成时的回调方法。
+
+异步文件通道AsynchronousFileChannel
+
+### 套接字通道绑定与配置
+NetworkChannel
+
+### IP组播通道
+
+# 国际化与本地化
+（过）
+
+# Java7其他重要更新
+
+## 关系数据库访问
+### 数据库查询的默认模式
+getSchema和setSchema 用来获取和设置数据库操作时是用的默认模式名称。通过设置后，在sql语句中酒不在需要使用模式名称作为前缀了。
+
+### 数据库连接超时时间与终止
+
+### 语句自动关闭
+
+# Java虚拟机
+
+
