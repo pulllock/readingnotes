@@ -422,3 +422,104 @@ long，double 需要声明为volatile，保证读取和写入操作的完整性�
 synchronized代码块，对应的监视器对象是synchronized代码块声明中的对象所关联的监视器对象。
 
 ### Object的wait，notify，notifyAll
+wait方法需要放到使用synchronized关键词声明的方法或代码块中。
+
+wait方法使当前线程进入等待状态，对应的notify和notifyAll用来通知线程离开等待状态。
+
+## 使用Thread类
+
+### 线程状态
+new
+
+runnable
+
+blocked
+
+waiting
+
+timed_waiting
+
+terminated
+
+
+
+sleep可以让当前线程进入睡眠状态一段时间，线程不会释放所持有的锁。
+
+## 非阻塞方式
+CAS
+
+Lock
+
+ReadWriteLock
+
+ReentrantLock
+
+ReentrantReadWriteLock
+
+Condition
+
+### 底层同步器
+
+### 高层同步对象
+信号量 用来管理数量有限的资源，信号量的值表示资源的可用数量。
+
+Semaphore
+
+倒数闸门 CountDownLatch 一个线程需要等待另外的线程完成某些任务后才能继续进行。
+
+循环屏障 CyclicBarrier
+
+对象交换器 Exchanger 适用于两个线程需要进行数据交换的场景。
+
+### 数据结构
+队列
+
+BlockingQueue
+
+ArrayBlockingQueue
+
+LinkedBlockingQueue
+
+BlockingDeque
+
+LinkedBlockingDeque
+
+ConcurrentLinkedQueue
+
+ConcurrentLinkedDeque
+
+集合类
+ConcurrentMap
+
+ConcurrentHashMap
+
+CopyOnWriteArrayList
+
+### 任务执行
+
+Callable
+
+Future
+
+Delayed
+
+Executor
+
+ExecutorService
+
+Executors
+
+## Java SE 7 新特性
+### 轻量级任务执行框架fork/join
+ForkJoinTask
+
+### 多阶段线程同步工具
+Phaser
+
+## ThreadLocal
+
+ThreadLocal
+
+ThreadLocalRandom
+
+
