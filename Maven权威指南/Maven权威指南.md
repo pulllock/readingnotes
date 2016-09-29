@@ -264,3 +264,251 @@ dependencyMangement
 生成一个站点 `mvn site`
 
 ## 打包相关生命周期
+
+### jar
+jar 是默认的打包类型。
+
+process-resources resources:resources
+
+complie complier:complie
+
+process-test-resources resources:testResources
+
+test-compile compiler:testCompile
+
+test surefire:test
+
+package jar:jar
+
+install install:install
+
+deploy deploy:deploy
+
+### pom
+pom是最简单的打包类型
+
+package site:attach-descriptor
+
+install install:install
+
+deploy deploy:deploy
+
+### maven plugin
+和Jar类似
+
+generate-resources plugin:descriptor
+
+process-resources resources:resources
+
+compile compiler:compile
+
+process-test-resources resources:testResources
+
+test-compile compiler:testCompile
+
+test surefire:test
+
+package jar:jar,plugin:addPluginArtifactMetadata
+
+install install:install,plugin:updateRegistry
+
+deploy deploy:deploy
+
+### ejb
+
+和jar类似 只不过package阶段如下：
+
+package ejb:ejb
+
+### war
+和jar类似
+
+package war:war
+
+### ear
+
+generate-resources ear:generate-application-xml       
+process-resources resources:resourcespackage ear:earinstall install:installdeploy deploy:deploy
+
+## 通用生命周期
+
+### process resources
+resources:resources 目标绑定到process-resources阶段，处理资源并将资源复制到输出目录。
+
+同时也会在资源上应用过滤器，替换资源中的一些符号。
+
+### Compile
+compile:compile会编译src/main/java中的所有内容至target/calsses。Compiler插件调用javac。
+
+可在pom中设置版本
+
+```
+<project>
+	...	<build>
+		...		<plugins>
+			<plugin>				<artifactId>maven-compiler-plugin</artifactId> 
+				<configuration>					<source>1.5</source>					<target>1.5</target>
+				</configuration>			</plugin>
+		</plugins> 
+		...	</build>	... 
+</project>
+```
+配置的是Compiler插件，不是compile:compile目标。
+
+要为compile:compile目标配置，需要放到compile:compile目标的execution元素下。
+
+定义源码的位置：
+
+```
+<build>
+	...
+	<sourceDirectory>src/java</sourceDirectory>
+	<outputDirectory>classes</outputDirectory>
+	...
+</build>
+```
+
+### process test resources
+和process-resources差不多
+
+### test compile
+基本和compile差不多
+
+### Test
+Surefire插件是maven的单元测试插件。
+
+默认会寻找测试源码目录下所有以*Test结尾的类。
+
+运行mvn test 之后，在target/surefire-reports目录生成了许多报告。
+
+单元测试失败的时候，默认是停止构建，可以使用testFailureIgnore配置为true，跳过失败。
+
+```
+<build>
+	<plugins>		<plugin>
+			<groupId>org.apache.maven.plugins</groupId> 		<artifactId>maven-surefire-plugin</artifactId>		<configuration>
+				<testFailureIgnore>true</testFailureIgnore>		</configuration>
+		</plugin>		...	</plugins> 
+</build>
+```
+
+跳过整个测试：
+
+`mvn install -Dmaven.test.skip=true`
+
+maven.test.skip变量同时控制Complier和Surefire插件。
+
+### install
+install:install目标是将项目的主要构件安装到本地仓库。
+
+### deploy
+该阶段用来将一个构件部署到远程maven仓库。
+
+部署设置通常在settings.xml中。
+
+# 构建Profile
+## 通过maven profiles 实现可移植性
+profile是一组可选的配置，用来设置或覆盖配置默认值。可为不同环境定制构建。
+
+profile在pom.xml中配置，给定一个id，运行maven的时候使用命令告诉maven运行特定的profile中的目标。
+
+```
+<profiles>	<profile>
+		<id>production</id>
+		<build>
+			<plugins>
+				<plugin>					<groupId>org.apache.maven.plugins</groupId> 			<artifactId>maven-compiler-plugin</artifactId> 		<configuration>						<debug>false</debug>#						<optimize>true</optimize>
+					</configuration>				</plugin>
+			</plugins>		</build>
+	</profile></profiles>
+```
+
+profiles 通常是pom.xml中的最后一个元素。
+
+必须要有一个id元素，使用的时候命令用`-P<profile_id>`调用。
+
+profile下可以包含其他的元素，上面的代码覆盖了Compiler插件的行为
+
+使用：`mvn clean install -Dproduction -x`
+
+-X 调试。
+
+### 覆盖一个项目对象模型
+profile可以覆盖几乎所有的pom.xml中的配置。
+
+## 激活profile
+
+```
+<profiles>	<profile>
+		<id>jdk16</id>
+		<activation>
+			<jdk>1.6</jdk>
+		</activation>
+		<modules>
+			<module>simple-script</module> 
+		</modules>	</profile>
+</profiles>
+```
+如上配置，在jdk1.6下运行mvn install 可以构建子目录simple-script，在jdk1.5下运行就不会构建simple-script子模块。
+
+### 激活配置
+激活配置元素下可以包含jdk版本，操作系统参数，文件，属性等。
+
+### 通过属性缺失激活
+可以基于属性如environment.type的值来激活profile。
+
+## 外部profile
+可以单独建立一个profiles.xml文件。
+
+## Settings Profile
+可以在settings.xml中配置profile
+
+~/.m2/settings.xml 用户配置
+
+maven/conf/settings.xml	全局配置
+
+## 列出活动的profile
+`mvn help:active-profiles` 列出所有激活的profile以及他们在哪里定义。
+
+# Maven套件
+Assembly
+
+命令行使用assembly:assembly
+
+绑定生命周期使用single
+
+### 预定义的套件描述符
+
+* bin 
+* jar-with-dependencies
+* project
+* src
+
+### 构建一个套件
+Assembly可以以两种方式运行：直接命令行调用或者绑定到声明周期阶段将其配置成标准构建过程的一部分。
+
+将项目复制一份
+
+`mvn -DdescriptorId=project assemble:single`
+
+生成可运行jar，如果没有任何依赖，使用jar插件的archive配置就能做到。有依赖的话使用以下配置生成可运行jar：
+
+```
+<build>
+	<plugins>		<plugin>
+			<artifactId>maven-assembly-plugin</artifactId> 			<version>2.2-beta-2</version>			<executions>				<execution>
+					<id>create-executable-jar</id> 					<phase>package</phase>
+					<goals>						<goal>single</goal>
+					</goals>
+					<configuration>						<descriptorRefs>
+							<descriptorRef>jar-with-dependencies</descriptorRef>						</descriptorRefs>
+						<archive>							<manifest>
+								<mainClass>org.sonatype.mavenbook.App</mainClass>							</manifest>
+						</archive>					</configuration>
+				</execution>			</executions>
+		</plugin>	</plugins>
+</build>
+```
+现在就可以使用mvn package生成可运行jar文件。
+
+## 套件描述符概述
