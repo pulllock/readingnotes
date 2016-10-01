@@ -512,3 +512,12 @@ Assembly可以以两种方式运行：直接命令行调用或者绑定到声明
 现在就可以使用mvn package生成可运行jar文件。
 
 ## 套件描述符概述
+
+# 属性和资源过滤
+## Maven属性
+
+* project.* 引用任何在pom中的值
+* settings.* 引用~/.m2/settings.xml中的值
+* env.* 环境变量PATH和M2_HOME可以使用env.* 前缀来引用
+* 系统属性 任何可以通过System.getProperty()方法获取的属性都可以作为Maven属性被引用
+
