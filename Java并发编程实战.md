@@ -188,10 +188,55 @@ shutdownNow执行粗暴的关闭，尝试取消所有运行中的任务，不再
 ### 延迟任务与周期任务
 
 ### 携带结果的任务Callable与Future
-Executor框架使用Runnable作为其基本的任务表示形式，但有很大局限性。
+Executor框架使用Runnable作为其基本的任务表示形式，但有很大局限性，不能返回一个值或抛出一个受检查的异常。
 
-### CompletionService
+Executor执行的任务有4个生命周期：创建，提交，开始，完成。
+
+已提交但尚未开始的任务可以取消，但对于已经开始的任务，只有响应中断时才能取消，取消已经完成的任务不会有任何影响。
+
+Future表示一个任务的生命周期，提供相应的方法来判断是否已经完成或取消，以及获取任务的结果和取消任务等。
+
+get方法的行为取决于任务的状态。如果任务已经完成，get就会立即返回或者抛出一个Exception，如果任务没有完成，那么get将阻塞并指导任务完成。如果任务抛出了异常，那么get将该异常封装为ExecutionException并重新抛出。
+
+ExecutorService中的所有submit方法都将返回一个Future，从而将一个Runnable或Callable提交给ExecutorService，并得到一个Future用来获得任务的执行结果或者取消任务。还可以显式的为某个Runnable或Callable实例化一个FutureTask。
+
+### CompletionService，Executor与BlockingQueue
+CompletionService将Executor和BlockingQueue功能融合到一起。你可以将Callable任务任务提交给它来执行，然后使用类似于队列操作的take和pull等方法来获取已完成的结果，结果会在完成时被封装成Future。ExecutorCompletionService实现了CompletionService，并将计算部分委托给一个Executor。
+
+Future.get
 
 # 取消与关闭
+## 任务取消
+### 中断
+每个线程都有一个boolean类型的中断状态，当中断线程时，这个线程的中断状态将被设置为true。
+
+在Thread中包含了中断线程以及查询线程中断状态的方法。interrupt方法能中断目标线程，而isInterrupted方法能返回目标线程的中断状态。静态的interrupted方法将清除当前线程的中断状态，并返回它之前的值，这也是清除中断状态的唯一方法。
+
+### 通过Future来实现取消
+Future的cancel方法带有一个boolean类型的参数mayInterruptIfRunning表示取消操作是否成功。如果mayInterruptIfRunning为true并且任务当前正在某个线程中运行，那么这个线程能被中断。如果这个参数为false，意味着若任务还没有启动就不要运行它。
+
+### 处理不可中断的阻塞
+许多可阻塞的方法都是通过提前返回或者抛出InterruptedException来响应中断请求的。
+
+并非所有的可阻塞方法或者阻塞机制都能响应中断。
+
+获取某个锁 如果一个线程由于等待某个内置锁而阻塞，那么将无法响应中断，因为线程认为它肯定会获得锁，所以将不会处理中断请求。
+
+Lock类中提供了lockInterruptibly方法，该方法允许在等待一个锁的同时仍能响应中断。
+
+### 采用newTaskFor来封装非标准的取消
+newTaskFor方法是一个工厂方法，它将创建Future来代表任务。
+
+还能返回一个RunnableFuture接口，该接口扩展了Future和Runnable。
+
+## 停止基于线程的服务
+
+### 关闭ExecutorService
+shutdown和shutdownNow方法
 
 # 线程池的使用
+### 设置线程池大小
+对于计算密集型的任务，拥有N个处理器，当线程池的大小为N+1时能实现最优的利用率。
+
+### 配置ThreadPoolExecutor
+
