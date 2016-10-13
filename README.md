@@ -8,7 +8,7 @@
 ## Java并发编程实战
 第一遍 完
 
-第二遍 6.3.2 携带结果的任务Callable与Future
+第二遍 8.3 配置ThreadPoolExecutor
 
 ## Spring3.x企业应用开发实战笔记
 第一遍 完
