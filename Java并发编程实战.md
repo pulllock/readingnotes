@@ -238,5 +238,56 @@ shutdown和shutdownNow方法
 ### 设置线程池大小
 对于计算密集型的任务，拥有N个处理器，当线程池的大小为N+1时能实现最优的利用率。
 
-### 配置ThreadPoolExecutor
+## 配置ThreadPoolExecutor
+
+### 线程的创建与销毁
+newFixedThreadPool工厂方法将线程池的基本大小和最大大小设置为参数中指定的值，而且创建的线程池不会超时。
+
+newCachedThreadPool工厂方法将线程池的最大大小设置为Integer.MAX_VALUE，而将基本大小设置为0，并将超时设置为1分钟，线程池可以被无限扩展，并且当需求降低时会自动收缩。
+
+# 显式锁
+## Lock与ReentrantLock
+Lock提供了一种无条件的，可轮询的，定时的，可中断的锁获取操作，所有加锁和解锁的方法都是显式的。
+
+ReentrantLock实现了Lock接口，提供了与synchronized相同的互斥性和内存可见性。
+
+### 轮询锁与定时锁
+可定时的与可轮询的锁获取模式是由tryLock方法实现的。避免死锁的发生。
+
+### 可中断的锁获取操作
+lockInterruptibly方法能够在获得锁的同时保持对中断的响应，由于它包含在Lock中，因此无需创建其他类型的不可中断阻塞机制。
+
+### 非块结构的加锁
+
+## 公平性
+ReentrantLock的构造函数提供了两种公平性选择：创建一个非公平的锁（默认），或者一个公平的锁。
+
+## 读写锁
+ReadWriteLock
+
+释放优先，读线程插队，重入性，降级，升级。
+
+ReentrantReadWriteLock为这两种锁都提供了可重入的加锁语义。在构造时可以选择是一个非公平（默认）或者是一个公平的锁。
+
+## 显式的Condition对象
+Condition是一种广义的内置条件队列。
+
+要创建一个Condition，可以再相关联的Lock上调用Lock.newCondition方法。
+
+在每个锁可存在多个等待，条件等待可以是可中断的活不可中断的，基于时限的等待，以及公平的活非公平的队列操作。
+
+Condition对象中与wait，notify和notifyAll方法对应的分别是await，singal和singalAll。
+
+## AbstrsctQueuedSynchronizer
+AQS
+
+# 原子变量与非阻塞同步机制
+
+### 比较并交换
+CAS指令，包含了3个操作数：需要读写的内存位置V，进行比较的值A，拟写入的新值B。当且仅当V的值等于A时，CAS才会通过原子方式用新值B来更新V的值，否则不会执行任何操作。返回V原有的值。
+
+
+# Java内存模型
+
+
 
