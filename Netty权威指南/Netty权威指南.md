@@ -52,3 +52,56 @@ CompletionHandler接口的实现类作为操作完成的回调。
 ### LineBasedFrameDecoder和StringDecoder
 LineBasedFrameDecoder的工作原理是它依次遍历ByteBuf中的可读字节判断看是否有`\n`或者`\r\n`，如果有就以此为结束位置，从可读索引到结束位置区间的字节就组成了一行。它是以换行符为结束标志的解码器，支持携带结束符或者不携带结束符两种解码方式，同时支持配置单行的最大长度。如果连续读取到最大长度后仍有没有发现换行符，就抛出异常，同时忽略之前读到的异常码流。
 
+StringDecoder就是将接收到的对象转换成字符串，然后继续调用后面的handler。
+
+可利用LineBasedFrameDecoder+StringDecoder来解决TCP的粘包/拆包问题。
+
+# 分隔符和定长解码器的应用
+## DelimiterBasedFrameDecoder
+以分隔符作为码流结束标识的消息的解码。
+
+## FixedLengthFrameDecoder
+固定长度解码器，能够按照指定的长度对消息进行自动解码。
+
+# 编解码技术
+## Java序列化的缺点
+
+* 无法跨语言
+* 序列化后的码流太大
+* 序列化性能太低
+
+## 业界主流的编解码框架
+
+* Protobuf
+* Thrift
+* Jboss Marshalling
+
+# MessagePack编解码
+
+# 服务端创建
+
+ServerBootstrap是服务端的启动辅助类。
+
+步骤：
+
+1. 创建ServerBootstrap实例
+2. 设置并绑定Reactor线程池
+3. 设置并绑定服务端Channel
+4. TCP链路建立时创建ChannelPipeline
+5. 添加并设置ChannelHandler
+6. 绑定监听端口并启动服务端
+7. Selector轮询
+8. 网络事件通知
+9. 执行Netty系统和业务HandlerChannel
+
+步骤1 创建ServerBootstrap实例，是netty服务端的启动辅助类，它提供一系列的方法用于设置服务端启动相关的参数。底层通过门面模式对各种能力进行抽象和封装。
+
+步骤2 设置并绑定Reactor线程池，netty的Reactor线程池是EventLoopGroup，实际就是EventLoop的数组，EventLoop的职责是处理所有注册到本线程多路复用器Selector上的Channel，Selector的轮询操作由绑定的EventLoop线程run方法驱动，在一个循环体内循环执行。
+
+步骤3 设置并绑定服务端Channel，作为NIO服务端，需要创建ServerSocketChannel，netty对原生的NIO类库进行了封装，对应实现是NioServerSocketChannel。ServerBootstrap方法提供了channel方法用于指定服务端Channel的类型。
+
+步骤4 链路建立的时候创建并初始化ChannelPipeline，不是NIO服务端必须的，本质是一个处理网络事件的职责链，负责管理和执行ChannelHandler。网络事件以事件流的形式在ChannelPipeline中流转，由ChannelPipeline根据ChannelHandler的执行策略调度ChannelHandler的执行。
+
+步骤5 初始化ChannelPipeline完成后，添加并设置ChannelHandler，ChannelHandler是netty提供给用户定制和扩展的接口，利用ChannelHandler可以完成大多数功能定制，如消息编解码，心跳，安全认证，TSL/SSL认证，流量控制和流量整形等。
+
+步骤6 绑定并启动监听端口，绑定监听端口之前会做一系列的初始化和检测工作，完成之后，会启动监听端口，并将ServerSocketChannel注册到Selector上监听客户端连接。
