@@ -41,3 +41,14 @@
 	一个多路复用器可以同时轮询多个Channel。
 	
 ## AIO编程
+NIO2.0引入了新的一步通道的概念。异步通道提供两种方式获取操作结果：
+
+* 使用java.util.concurrent.Future类来表示异步操作的结果。
+* 在异步执行操作的时候传入一个java.nio.channels。
+
+CompletionHandler接口的实现类作为操作完成的回调。
+
+# TCP粘包/拆包
+### LineBasedFrameDecoder和StringDecoder
+LineBasedFrameDecoder的工作原理是它依次遍历ByteBuf中的可读字节判断看是否有`\n`或者`\r\n`，如果有就以此为结束位置，从可读索引到结束位置区间的字节就组成了一行。它是以换行符为结束标志的解码器，支持携带结束符或者不携带结束符两种解码方式，同时支持配置单行的最大长度。如果连续读取到最大长度后仍有没有发现换行符，就抛出异常，同时忽略之前读到的异常码流。
+
