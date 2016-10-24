@@ -111,3 +111,6 @@ ServerBootstrap是服务端的启动辅助类。
 步骤8 当轮询到就绪的Channel后，由Reactor线程NioEventLoop执行ChannelPipeline的相应方法，最终调度并执行ChannelHandler。
 
 步骤9 执行netty系统ChannelHandler和用户定制的ChannelHandler。
+
+
+backlog指定了内核为此套接口排队的最大连接个数。
