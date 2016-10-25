@@ -114,3 +114,74 @@ ServerBootstrap是服务端的启动辅助类。
 
 
 backlog指定了内核为此套接口排队的最大连接个数。
+
+## Netty服务端创建源码分析
+
+# ByteBuf和相关辅助类
+## ByteBuf功能说明
+进行数据传输的时候，需要用到缓冲区，常用的缓冲区是Jdk NIO类库的Buffer。
+
+7种基础类型除了Boolean都有自己的缓冲区实现。主要使用ByteBuffer。
+
+ByteBuffer缺点：
+
+* ByteBuffer长度固定，一旦分配完成，容量不能动态扩展收缩。
+* ByteBuffer只有一个标识位置的指针position，读写的时候需要手工调用flap和rewind等。
+* ByteBuffer功能有限。
+
+### ByteBuf的工作原理
+ByteBuf通过两个位置指针来协助缓冲区的读写操作，读使用readerIndex，写使用writerIndex。
+
+readerIndex和writerIndex的取值一开始都是0，随着数据的写入writerIndex会增加，读取会使readerIndex增加，但不会超过writerIndex。
+
+在读取之后0-readerIndex被视为discard的，调用discardReadBytes方法可释放这部分空间，作用类似ByteBuffer的compact。
+
+readerIndex和writerIndex之间的数据是可读取的，等价于ByteBuffer的position和limit之间的数据。writerIndex和capacity之间的空间是可写的，等价于ByteBuffer的limit和capacity之间的可用空间。
+
+ByteBuf对write操作进行了封装，缓冲区不足会自动进行动态扩展。
+
+### ByteBuf的功能介绍
+#### 顺序读操作read
+read操作类似于ByteBuffer的get操作。
+
+#### 顺序写操作write
+write操作类似于ByteBuffer的put操作。
+
+#### readerIndex和writerIndex
+读索引和写索引
+
+#### Discardable bytes
+调用discardReadBytes会发生字节数组的内存复制。
+
+#### Readable bytes和Writable bytes
+
+#### Clear操作
+ByteBuffer的clear操作并不会清空缓冲区内容本身，它主要用来操作位置指针如position，limit，mark。对于ByteBuf也是操作readerIndex和writerIndex，见他们还原为初始分配的值。
+
+#### mark和rest
+ByteBuffer调用mark操作会将当前的位置指针备份到mark变量中，当调用rest操作后，重新将指针的当前位置恢复为备份在mark中的位置。
+
+Netty的ByteBuf也有类似的rest和mark接口。
+
+* markReaderIndex将当前的readerIndex备份到markedReaderIndex中
+* resetReaderIndex将当前的readerIndex设置为markedReaderIndex
+* markWriterIndex将当前writerIndex备份到markedWriterIndex
+* resetWriterIndex将当前writerIndex设置为markedWriterIndex
+
+#### 查找操作
+#### Derived buffers
+类似于数据库的视图
+
+1. duplicate 返回当前ByteBuf的复制对象，复制后返回的ByteBuf与操作的ByteBuf共享缓冲区内容，但是维护自己独立的读写索引。修改复制后的内容，之前原来的内容也随着改变，双方持有的是同一个内容指针引用。
+2. copy 复制一个新对象，内容和索引都是独立的，复制操作本身并不修改原来的读写索引。
+3. copy(int index,int length) 从指定的索引开始复制，复制的字节长度为length，复制后的ByteBuf内容和读写索引都与之前的独立。
+4. slice 返回当前ByteBuf的可读子缓冲区，起始位置从readerIndex到writerIndex，返回后的ByteBuf与原ByteBuf共享内容，但是读写索引独立维护。
+5. slice(int index,int length)返回当前ByteBuf的可读子缓冲区，起始位置从index到index+length，与原ByteBuf共享内容，但是读写索引独立维护。
+
+#### 转换成标准的ByteBuffer
+
+1. ByteBuffer nioBuffer()将当前ByteBuf可读的缓冲区转换成ByteBuffer，两者共享同一个缓冲区内容引用，对ByteBuffer的读写操作并不会修改原ByteBuf的读写索引，返回后的ByteBuffer无法感知原ByteBuf的动态扩展操作。
+2. ByteBuffer nioBuffer(int index,int length) 将当前ByteBuff从index开始长度为length的缓冲区转换成ByteBuffer。
+
+#### 随机读写set和get
+无论是get还是set操作ByteBuf都会对齐索引和长度进行合法性校验。
