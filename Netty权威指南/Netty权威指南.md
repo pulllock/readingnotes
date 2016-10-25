@@ -184,4 +184,74 @@ Netty的ByteBuf也有类似的rest和mark接口。
 2. ByteBuffer nioBuffer(int index,int length) 将当前ByteBuff从index开始长度为length的缓冲区转换成ByteBuffer。
 
 #### 随机读写set和get
-无论是get还是set操作ByteBuf都会对齐索引和长度进行合法性校验。
+无论是get还是set操作ByteBuf都会对齐索引和长度进行合法性校验。set不支持动态扩展缓冲区。
+
+## ByteBuf源码分析
+## ByteBuf的主要继承关系
+内存分配的角度：
+
+1. 堆内存（HeapByteBuf）字节缓冲区，内存的分配和回收速度快，可以被JVM自动回收，缺点是如果进行Socket的I/O读写，需要额外做一次内存复制，将堆内存对应的缓冲区复制到内核Channel中，性能会有一定程度下降。
+2. 直接内存（DirectByteBuf）字节缓冲区，在堆外进行内存分配，分配和回收速度会慢一些，但是将它写入或者从Socket Channel中读取时，速度比堆内存快。
+
+内存回收角度：
+
+基于对象池的ByteBuf和普通ByteBuf，基于对象池的ByteBuf可以重用ByteBuf对象。
+
+### AbstractByteBuf源码分析
+#### 主要成员变量
+ResourceLeakDetector对象，定义为static，所有的ByteBuf实例共享同一个对象，用于检测对象是否泄漏。
+
+#### 读操作簇
+读操作以及其他的一些公共功能由父类实现，差异化功能由子类实现。
+
+#### 写操作簇
+
+#### 操作索引
+与索引相关的操作主要涉及设置读写索引，mark，reset等。
+
+#### 重用缓冲区
+discardReadBytes等。
+
+#### skipBytes
+需要丢弃非法的数据报，或者跳过不需要读取的字节或者字节数组，skip非常方便。
+
+### AbstractReferenceCountedByteBuf源码解析
+该类主要是对引用进行计数，类似JVM内存回收的对象引用计数器，用于跟踪对象的分配和销毁，做自动内存回收。
+
+#### 成员变量
+
+`private static final AtomicIntegerFieldUpdater<AbstractReferenceCountedByteBuf> refCntUpdater;` 通过原子的方式对成员变量进行更新操作，以实现线程安全，消除锁。
+
+`private volatile int refCnt = 1;` refCnt字段用于跟踪对象的引用次数。
+
+#### 对象引用计数器
+每调用一次retain方法，引用计数器就加1。
+
+release方法释放引用计数器。
+
+### UnpooledHeapByteBuf源码分析
+UnpooledHeapByteBuf是基于堆内存进行内存分配的字节缓冲区，没有基于对象池，意味着每次I/O的读写都会创建一个新的UnpooledHeapByteBuf，频繁进行大块内存分配和回收会对性能造成影响。
+
+#### 成员变量
+`private final ByteBufAllocator alloc;` 用于UnpooledHeapByteBuf的内存分配。
+
+`private byte[] array;` 作为缓冲区。
+
+`private ByteBuffer tmpNioBuf;` 用于实现Netty ByteBuf到JDK NIO ByteBuffer的转换。
+
+#### 动态扩展缓冲区
+#### 字节数组复制
+#### 转换成JDK ByteBuffer
+nioBuffer 调用ByteBuffer的wrap方法。
+
+#### 子类实现相关方法
+
+* isDirect 如果是基于堆内存实现的ByteBuf，返回false.
+* HasArray 由于UnpooledHeapByteBuf基于字节数组实现，所以返回true。
+* array 由于UnpooledHeapByteBuf基于字节数组实现，所以返回的是内部的字节数组成员变量。
+
+内存地址相关的接口主要是UnsafeByteBuf使用。
+
+UnpooledDirectByteBuf内部缓冲区由java.nio.DirectByteBuffer实现。
+
+
