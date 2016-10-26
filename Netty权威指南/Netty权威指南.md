@@ -254,4 +254,71 @@ nioBuffer 调用ByteBuffer的wrap方法。
 
 UnpooledDirectByteBuf内部缓冲区由java.nio.DirectByteBuffer实现。
 
+### PooledByteBuf内存池原理分析
+#### PoolArena
+本身是指一块区域，内存管理中Memory Arena是指内存中的一大块连续的区域，PoolArena是Netty的内存池实现类。
 
+Netty的PoolArena由多个Chunk组成的大块内存区域，每个Chunk由一个或者多个Page组成。
+
+#### PoolChunk
+Chunk主要用来组织和管理多个Page的内存分配和释放，Netty中Chunk的Page被构建成一颗二叉树。
+
+#### PoolSubpage
+
+#### 内存回收策略
+Chunk和Page都是通过状态位来标识内存是否可用。
+
+### PooledDirectByteBuf
+基于内存池实现，与UnPooledDirectByteBuf的唯一不同就是缓冲区的分配和销毁策略不同。
+
+#### 创建字节缓冲区实例
+由于采用内存池实现，所以新创建PooledDirectByteBuf对象时不能直接new一个实例，而是从内存池中获取，然后设置引用计数器的值。
+
+#### 复制新的字节缓冲区实例
+copy(int index,int length)复制一个新的实例，与原来的PooledDirectByteBuf独立。
+
+## ByteBuf相关的辅助类功能介绍
+### ByteBufHolder
+是ByteBuf的容器。
+
+### ByteBufAllocator
+字节缓冲区分配器。
+
+### CompositeByteBuf
+允许将多个ByteBuf的实例组装到一起，形成一个统一的视图。
+
+### ByteBufUtil
+提供了一些静态方法用于操作ByteBuf对象。
+
+# Channel和Unsafe
+## Channel功能说明
+包括但不限于网路的读写，客户端发起连接，主动关闭连接，链路关闭，获取通信双方的网络地址等。
+
+### Channel的工作原理
+是Netty抽象出来的网络I/O读写的相关接口。
+
+### Channel的功能介绍
+#### 网络I/O操作
+1. `Channel read()` 从当前的Channel中读取数据到第一个inbound缓冲区中，如果数据被成功读取，触发`ChannelHandler.channelRead()`事件。读取完成后，接着会触发`ChannelHandler.channelReadComplete()`事件。
+2. `ChannelFuture write(Object msg)` 请求将当前的msg通过ChannelPipeline写入到目标Channel中，只是将消息存入到消息发送环形数组中，没有真正被发送，调用flush才会被写入到Channel。
+3. `ChannelFuture write(Object msg,ChannelPromise promise)` 携带了ChannelPromise参数负责设置写入操作的结果。
+4. `ChannelFuture writeAndFlush(Object msg,ChannelPromise promise)` 将消息写入Channel中发送，等价于单独调用write和flush操作的组合。
+5. `ChannelFuture writeAndFlush(Object msg)` 等同于4。
+6. `Channel flush()` 将之前写入到环形发送数组中的消息全部写入到目标Channel中，发送给通信对方。
+7. `ChannelFuture close(ChannelPromise promise)`主动关闭当前连接，通过ChannelPromise设置操作结果并进行结果通知，无论操作是否成功，都可以通过ChannelPromise获取操作结果。该操作会级联触发ChannelPipeline中的所有ChannelHandler的`ChannelHandler.close(ChannelHandlerContext,ChannelPromise)`事件。
+8. `ChannelFuture disconnect(ChannelPromise promise)`请求断开与远程通信对端的连接并使用ChannelPromise来获取操作结果的通知消息。该方法会级联触发`ChannelHandler.disconnect(ChannelHandlerContext,ChannelPromise)`事件。
+9. `ChannelFuture connect(SocketAddress remoteAddress)`客户端使用指定的服务端地址remoteAddress发起连接请求，如果连接因为应答超时而失败，ChannelFuture中的操作结果是ConnectTimeoutException异常，如果连接被拒绝，操作结果为ConnectException，该方法会级联触发`ChannelHandler.connect(ChannelHandlerConext,SocketAddress,ChannelPromise)`事件
+10. `ChannelFuture connect(SocketAddress remoteAddress,SocketAddress localAddress)`
+11. `ChannelFuture connect(SocketAddress remoteAddress,ChannelPromise promise)`
+12. `connect(SocketAddress remoteAddress,ChannelPromise promise)`
+13. `ChannelFuture bind(SocketAddress localAddress)`绑定指定的本地Socket地址localAddress，该方法会级联触发`ChannelHandler.bind(ChannelHandlerContext,SocketAddress,ChannelPromise)`事件。
+14. `ChannelFuture bind(SocketAddress localAddress,ChannelPromise promise)`
+15. `ChannelConfig config()` 获取当前Channel的配置信息。
+16. `boolean isOpen()` 判断当前Channel是否已经打开
+17. `boolean isRegistered()`判断当前Channel是否已经注册到EventLoop上。
+18. `boolean isActive()` 判断当前Channel是否已经处于激活状态。
+19. `ChannelMetadata metadata()`获取当前Channel的元数据描述信息。
+20. `SocketAddress localAddress()`获取当前Channel的本地绑定地址。
+21. `SocketAddress remoteAddress()`获取当前Channel通信的远程Socket地址。
+
+## Channel源码分析
