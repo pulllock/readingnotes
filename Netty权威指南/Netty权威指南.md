@@ -322,3 +322,35 @@ copy(int index,int length)复制一个新的实例，与原来的PooledDirectByt
 21. `SocketAddress remoteAddress()`获取当前Channel通信的远程Socket地址。
 
 ## Channel源码分析
+### AbstractChannel源码分析
+AbstractChannel聚合了所有Channel使用到的能力对象，由AbstractChannel提供初始化和统一封装。
+
+当Channel进行I/O操作时会产生对应的I/O事件，然后驱动事件在ChannelPipeline中传播，由对应的ChannelHandler对事件进行拦截和处理，不关心的事件可以直接忽略。
+
+网络I/O操作直接调用DefaultChannelPipeline的相关方法，由DefaultChannelPipeline中对应的ChannelHandler进行具体的逻辑处理。
+
+### AbstractNioChannel源码分析
+由于Nio Channel，NioSocketChannel，NioServerSocketChannel需要共用，所以定义了一个java.nio.SocketChannel和java.ServerSocketChannel的公共父类SelectableChannel，用于设置参数和I/O操作。
+
+readInterestOp代表了JDK SelectionKey的OP_READ。
+
+`volatile SelectionKey selectionKey;`是Channel注册到EventLoop后返回的选择键。
+
+### AbstractNioByteChannel源码分析
+### AbstractNioMessageChannel源码分析
+AbstractNioMessageChannel和AbstractNioByteChannel的消息发送实现比较相似，不同之处是一个发送的是ByteBuf或者FileRegion，他们可以直接被发送，另一个发送的则是POJO对象。
+
+### AbstractNioMessageServerChannel源码分析
+
+### NioServerSocketChannel源码分析
+
+### NioSocketChannel源码分析
+
+## Unsafe功能说明
+是Channel接口的辅助接口，不应被用户代码调用。实际的I/O读写操作都是由Unsafe接口负责完成的。
+
+### AbstractUnsafe源码分析
+
+### AbstractNioUnsafe源码分析
+
+### NioByteUnsafe源码分析
