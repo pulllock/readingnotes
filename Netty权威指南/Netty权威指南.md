@@ -197,6 +197,114 @@ Netty的ByteBuf也有类似的rest和mark接口。
 
 基于对象池的ByteBuf和普通ByteBuf，基于对象池的ByteBuf可以重用ByteBuf对象。
 
+> 源码版本4.1.6.final
+
+`public abstract int capacity();` 缓冲区的容量。
+
+`public abstract ByteBuf capacity(int newCapacity);` 重新调整容量，返回新的ByteBuf；如果新的容量小于现在的容量，buffer将会被截断；如果新的容量大于现在的容量，返回新的ByteBuf，新的ByteBuf是在原来的基础上增加的，新加的容未指定数据。
+
+`public abstract int maxCapacity();` 缓冲区最大容量。
+
+`public abstract ByteBufAllocator alloc();` 返回创建自己的Allocator。
+
+`public abstract ByteBuf unwrap();` 返回一个未被包装的ByteBuf。
+
+`public abstract boolean isDirect();` 如果是直接内存，就返回true。
+
+`public abstract boolean isReadOnly();` buffer如果只读，返回true。
+
+`public abstract ByteBuf asReadOnly();` 返回当前ByteBuf的只读的一个版本。
+
+`public abstract int readerIndex();` 读取索引。
+
+`public abstract ByteBuf readerIndex(int readerIndex);` 设置读取索引。
+
+`public abstract int writerIndex();` 写入索引。
+
+`public abstract ByteBuf writerIndex(int writerIndex);` 设置写入索引。
+
+`public abstract ByteBuf setIndex(int readerIndex, int writerIndex);` 设置读取和写入索引。
+
+`public abstract int readableBytes();` 返回可读的字节数。从readerIndex到writerIndex中间的。
+
+`public abstract int writableBytes();`  返回可写的字节数，从writerIndex到capacity之间的。
+
+`public abstract int maxWritableBytes();` 最大的可写的字节数，从writerIndex到maxCapacity之间。
+
+`public abstract boolean isReadable();`writerIndex减去readerIndex大于零，返回true。
+
+`public abstract boolean isReadable(int size);` 大于或者等于指定的大小的，返回true。
+
+`public abstract boolean isWritable();` 是否可写。
+
+`public abstract boolean isWritable(int size);`是否可写
+
+`public abstract ByteBuf clear();` 设置readerIndex和writerIndex为0，跟NIO buffer不同。
+
+`public abstract ByteBuf markReaderIndex();` 标记readerIndex，可以使用resetReaderIndex来移动当前的readerIndex到标记的readerIndex。
+
+`public abstract ByteBuf resetReaderIndex();` 重置readerIndex。
+
+`public abstract ByteBuf markWriterIndex();`标记writerIndex。
+
+`public abstract ByteBuf resetWriterIndex();` 重置writerIndex。
+
+`public abstract ByteBuf discardReadBytes();`丢弃从0到readerIndex之间的bytes，移动readerIndex与writerIndex之间的数据到0开始，readerIndex=0，writerIndex=oldWriterIndex-oldReaderIndex。
+
+`public abstract ByteBuf discardSomeReadBytes();`跟discardReadBytes类似，实际丢弃的数据跟具体实现类的逻辑相关。
+
+`public abstract ByteBuf ensureWritable(int minWritableBytes);` 确保指定的最小可写字节数能写入。
+
+`public abstract int ensureWritable(int minWritableBytes, boolean force);`确保指定的最小可写字节数能写入，可写并且容量没变返回0，不可写并且容量没变返回1，可写并且容增大了返回2，不可写但是容增到最大容量了返回3。
+
+```
+指定的位置返回某种类型的数据，不会改变readerIndex和writerIndex。
+public abstract boolean getBoolean(int index);
+public abstract byte  getByte(int index);
+public abstract short getUnsignedByte(int index);
+...(省略)
+```
+
+`public abstract ByteBuf getBytes(int index, ByteBuf dst);`把当前的Buffer从index开始写到dst中，直到不可写为止，不会修改当前buffer的readerIndex和writerIndex，但是会修改dst的writerIndex。
+
+`public abstract ByteBuf getBytes(int index, ByteBuf dst, int length);` 指定了传输数据的长度。
+
+`public abstract ByteBuf getBytes(int index, ByteBuf dst, int dstIndex, int length);` 指定了要写入的位置和要传输的长度，该方法不会修改传输和别写入的buffer的readerIndex和writerIndex。
+
+`public abstract ByteBuf getBytes(int index, byte[] dst);`从指定位置传输到dst,不会修改当前buffer的readerIndex和writerIndex。
+
+`public abstract ByteBuf getBytes(int index, byte[] dst, int dstIndex, int length);`
+
+`public abstract ByteBuf getBytes(int index, ByteBuffer dst);` 被写入的ByteBuffer的position会改变。
+
+`public abstract ByteBuf getBytes(int index, OutputStream out, int length) throws IOException;` 写入到OutputStream。
+
+`public abstract int getBytes(int index, GatheringByteChannel out, int length) throws IOException;` 写入到GatheringByteChannel。
+
+`public abstract int getBytes(int index, FileChannel out, long position, int length) throws IOException;` 写入到FileChannel，不会修改Channel的position。
+
+`public abstract CharSequence getCharSequence(int index, int length, Charset charset);` 获取CharSequence。
+
+```
+在指定位置设置为指定类型的值，不会改变当前ByteBuf的readerIndex和writerIndex。
+public abstract ByteBuf setBoolean(int index, boolean value);
+public abstract ByteBuf setByte(int index, int value);
+public abstract ByteBuf setShort(int index, int value);
+...(省略)
+```
+
+```
+在当前的readerIndex处获取指定类型的值，readerIndex会加一
+public abstract boolean readBoolean();
+public abstract byte  readByte();
+...(省略)
+
+```
+
+`public abstract ByteBuf readSlice(int length);`
+
+``
+
 ### AbstractByteBuf源码分析
 #### 主要成员变量
 ResourceLeakDetector对象，定义为static，所有的ByteBuf实例共享同一个对象，用于检测对象是否泄漏。
