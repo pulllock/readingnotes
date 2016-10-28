@@ -302,10 +302,123 @@ public abstract byte  readByte();
 ```
 
 `public abstract ByteBuf readSlice(int length);`
+返回当前ByteBuf新创建的子区域，开始位置为readerIndex，长度为length。与原ByteBuf共享缓冲区，但是独立维护自己的readerIndex和writerIndex。
 
-``
+`public abstract ByteBuf readRetainedSlice(int length);` 会调用retain方法增加引用计数。
+
+`public abstract ByteBuf readBytes(ByteBuf dst);`将当前ByteBuf的数据传输到指定的ByteBuf，读取的位置在当前的readerIndex，一直到目标ByteBuf不能写。当前的ByteBuf的readerIndex会增加，被写入的ByteBuf的writerIndex会增加
+
+`public abstract ByteBuf readBytes(ByteBuf dst, int length);`指定读取的长度。
+
+`public abstract ByteBuf readBytes(ByteBuf dst, int dstIndex, int length);`指定读取的长度和目标ByteBuf写入的起始位置。
+
+`public abstract ByteBuf readBytes(byte[] dst);`写入到字节数组中去，当前ByteBuf的readerIndex会增加。
+
+`public abstract ByteBuf readBytes(byte[] dst, int dstIndex, int length);` 指定读取的长度和写入的起始位置。
+
+`public abstract ByteBuf readBytes(ByteBuffer dst);`从readerIndex开始读取数据到指定的ByteBuffer中去。
+
+`public abstract ByteBuf readBytes(OutputStream out, int length) throws IOException;` 传输到OutputStream。
+
+`public abstract int readBytes(GatheringByteChannel out, int length) throws IOException;` 传输到GatheringByteChannel中。
+
+`public abstract CharSequence readCharSequence(int length, Charset charset);` 获取CharSequence，readerIndex会增加。
+
+`public abstract int readBytes(FileChannel out, long position, int length) throws IOException;` 传输到FileChannel。
+
+`public abstract ByteBuf skipBytes(int length);`跳过指定长度的bytes，readerIndex增加。
+
+```
+在当前writerIndex处写入执行类型的值，writerIndex增加。
+public abstract ByteBuf writeBoolean(boolean value);
+public abstract ByteBuf writeByte(int value);
+public abstract ByteBuf writeShort(int value);
+...(省略)
+```
+
+`public abstract ByteBuf writeBytes(ByteBuf src);` 从指定的ByteBuf中传输数据到当前的ByteBuf，从当前的writerIndex开始写入，直到源ByteBuf不可读为止。源ByteBuf的readerIndex增加。
+
+`public abstract ByteBuf writeBytes(ByteBuf src, int length);` 指定了写入的长度。
+
+`public abstract ByteBuf writeBytes(ByteBuf src, int srcIndex, int length);` 指定源ByteBuf开始读取的位置，读取的长度。
+
+`public abstract ByteBuf writeBytes(byte[] src);`  从字节数组中读取。
+
+`public abstract ByteBuf writeBytes(byte[] src, int srcIndex, int length);`
+
+`public abstract ByteBuf writeBytes(ByteBuffer src);`
+
+`public abstract int  writeBytes(InputStream in, int length) throws IOException;`
+
+`public abstract int writeBytes(ScatteringByteChannel in, int length) throws IOException;`
+
+`public abstract int writeBytes(FileChannel in, long position, int length) throws IOException;`
+
+`public abstract ByteBuf writeZero(int length);`从writerIndex开始讲长度为length的数据置为NUL。
+
+`public abstract int writeCharSequence(CharSequence sequence, Charset charset);`写入CharSequence。
+
+`public abstract int indexOf(int fromIndex, int toIndex, byte value);` 查找第一个匹配value的位置，不会改变readerIndex和writerIndex。
+
+```
+从当前ByteBuf中定位出首次出现value的位置
+public abstract int bytesBefore(byte value);
+public abstract int bytesBefore(int length, byte value);
+public abstract int bytesBefore(int index, int length, byte value);
+``` 
+
+```
+使用指定的processor来迭代当前的ByteBuf的可读字节数组。与processor设置的查找条件进行对比，如果满足条件，则返回位置索引，否则返回-1。
+public abstract int forEachByte(ByteProcessor processor);
+public abstract int forEachByte(int index, int length, ByteProcessor processor);
+
+逆序迭代
+public abstract int forEachByteDesc(ByteProcessor processor);
+
+public abstract int forEachByteDesc(int index, int length, ByteProcessor processor);
+```
+
+`public abstract ByteBuf copy();`从当前的ByteBuf复制一份新的ByteBuf，内容和索引都是独立的。复制操作不会修改原来的readerIndex和writerIndex。
+
+`public abstract ByteBuf copy(int index, int length);`从指定的index出开始复制长度为length的数据到新的ByteBuf，新的ByteBuf和原来的相互独立，此操作不会改变原来ByteBuf的readerIndex和writerIndex。
+
+```
+public abstract ByteBuf slice();
+public abstract ByteBuf slice(int index, int length);
+返回当前ByteBuf的可读子缓冲区，起始位置从readerIndex到writerIndex，新的ByteBuf与原ByteBuf共享内容，读写索引独立维护。该操作不会修改原来的readerIndex和writerIndex。
+```
+
+```
+public abstract ByteBuf retainedSlice();
+public abstract ByteBuf retainedSlice(int index, int length);
+```
+
+`public abstract ByteBuf duplicate();` 返回当前ByteBuf的复制对象，新的与原来的ByteBuf共享缓冲区内容，但是维护自己独立的对鞋索引。
+
+`public abstract ByteBuf retainedDuplicate();`
+
+`public abstract ByteBuffer nioBuffer();`把当前的ByteBuf可读的缓冲区转换成ByteBuffer，共享同一个缓冲区内容引用，对ByteBuffer的读写操作不会修改原ByteBuf的读写索引，返回后的ByteBuffer无法感知原ByteBuf的动态扩展操作。
+
+`public abstract ByteBuffer nioBuffer(int index, int length);`
+
+`public abstract ByteBuffer internalNioBuffer(int index, int length);`内部使用，转换成ByteBuffer。
+
+`public abstract ByteBuffer[] nioBuffers();`转换成ByteBuffer数组。
+
+`public abstract ByteBuffer[] nioBuffers(int index, int length);`
+
+`public abstract boolean hasArray();`判断是否有字节数组，如果返回true可以安全的使用array()和arrayOffser()方法。
+
+`public abstract byte[] array();`返回字节数组。
+
+`public abstract int arrayOffset();`
+
+`public abstract boolean hasMemoryAddress();`判断是否有指向内存地址的引用。
+
+`public abstract long memoryAddress();` 返回内存地址。
 
 ### AbstractByteBuf源码分析
+AbstractByteBuf继承自ByteBuf，ByteBuf的一些公共属性和功能会在AbstractByteBuf中实现。
 #### 主要成员变量
 ResourceLeakDetector对象，定义为static，所有的ByteBuf实例共享同一个对象，用于检测对象是否泄漏。
 
@@ -323,6 +436,181 @@ discardReadBytes等。
 #### skipBytes
 需要丢弃非法的数据报，或者跳过不需要读取的字节或者字节数组，skip非常方便。
 
+> 源码版本4.1.6.final
+
+`static final ResourceLeakDetector<ByteBuf> leakDetector =
+            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(ByteBuf.class);` 用于检测对象是否泄漏，被定义为static，所有的ByteBuf实例共享同一个ResourceLeakDetector对象。
+
+##### 重用缓冲区
+```
+@Override
+public ByteBuf discardReadBytes() {
+	//确保可以访问
+    ensureAccessible();
+    //读索引为0，没有可重用的缓冲区，直接返回。
+    if (readerIndex == 0) {
+        return this;
+    }
+	//readerIndex不等于writerIndex，说明缓冲区中有已经读过的被丢弃的缓冲区，也有尚未读取的可读缓冲区。
+    if (readerIndex != writerIndex) {
+    	//字节数组的复制，尚未读取的字节数组复制到缓冲区的起始位置。
+        setBytes(0, this, readerIndex, writerIndex - readerIndex);
+        //writerIndex设置为之前的writerIndex减去readerIndex，既是重用缓冲区的长度。
+        writerIndex -= readerIndex;
+        //重新调整markedReaderIndex和markedWriterIndex
+        adjustMarkers(readerIndex);
+        //readerIndex变成了0
+        readerIndex = 0;
+    } else {//如果readerIndex和writerIndex相等，说明没有可读的字节数组，不需要复制数组，直接调整mark。
+    	//重新调整markedReaderIndex和markedWriterIndex
+        adjustMarkers(readerIndex);
+        //读写索引都设置为0。
+        writerIndex = readerIndex = 0;
+    }
+    return this;
+}
+```
+
+##### adjustMarkers()
+
+```
+protected final void adjustMarkers(int decrement) {
+    int markedReaderIndex = this.markedReaderIndex;
+    //备份的markedReaderIndex如果小于等于需要减少的值，markedReaderIndex设为0。
+    if (markedReaderIndex <= decrement) {
+        this.markedReaderIndex = 0;
+        int markedWriterIndex = this.markedWriterIndex;
+        //备份的markedWriterIndex如果小于等于需要减少的值，markedWriterIndex设为0。
+        if (markedWriterIndex <= decrement) {
+            this.markedWriterIndex = 0;
+        } else {
+        	//markedWriterIndex减去需要减少的值就是新的markedWriterIndex。
+            this.markedWriterIndex = markedWriterIndex - decrement;
+        }
+    } else {
+    	//如果需要减小的值小于markedReaderIndex，则也一定小于markedWriterIndex，新值就是减去需要减小的值之后的取值。
+        this.markedReaderIndex = markedReaderIndex - decrement;
+        markedWriterIndex -= decrement;
+    }
+}
+```
+
+##### ensureWritable
+确保能够写入指定的大小
+
+```
+public ByteBuf ensureWritable(int minWritableBytes) {
+    if (minWritableBytes < 0) {
+        throw new IllegalArgumentException(String.format(
+                "minWritableBytes: %d (expected: >= 0)", minWritableBytes));
+    }
+    //实现方法
+    ensureWritable0(minWritableBytes);
+    return this;
+}
+```
+
+```
+private void ensureWritable0(int minWritableBytes) {
+	//writableBytes()==capacity() - writerIndex;
+	//要写入的字节数组长度小于当前ByteBuf可写的字节数，说明可以写入，直接返回。
+    if (minWritableBytes <= writableBytes()) {
+        return;
+    }
+	//如果要写入的字节数组大于可动态扩展的最大可写字节数，说明缓冲区无法写入超过最大容量的字节数组，抛异常。
+    if (minWritableBytes > maxCapacity - writerIndex) {
+        throw new IndexOutOfBoundsException(String.format(
+                "writerIndex(%d) + minWritableBytes(%d) exceeds maxCapacity(%d): %s",
+                writerIndex, minWritableBytes, maxCapacity, this));
+    }
+
+    //要写入的字节数虽然大于当前ByteBuf可写的字节数，但是可以通过动态扩展满足新的写入请求，则进行动态扩展。
+    int newCapacity = alloc().calculateNewCapacity(writerIndex + minWritableBytes, maxCapacity);
+
+    //重新设置为新的容量
+    capacity(newCapacity);
+}
+```
+
+##### calculateNewCapacity
+
+```
+//此方法实现位于AbstractByteBufAllocator类
+public int calculateNewCapacity(int minNewCapacity, int maxCapacity) {
+    if (minNewCapacity < 0) {
+        throw new IllegalArgumentException("minNewCapacity: " + minNewCapacity + " (expectd: 0+)");
+    }
+    //满足要求的最小容量比最大可扩展的容量大，直接抛异常。
+    if (minNewCapacity > maxCapacity) {
+        throw new IllegalArgumentException(String.format(
+                "minNewCapacity: %d (expected: not greater than maxCapacity(%d)",
+                minNewCapacity, maxCapacity));
+    }
+    //门限阈值为4M
+    final int threshold = 1048576 * 4; // 4 MiB page
+	//最小需要的新容量正好等于阈值，使用阈值作为新缓冲区的容量。
+    if (minNewCapacity == threshold) {
+        return threshold;
+    }
+
+    //最小需要的新容量大于阈值，不能采用倍增的方式扩展内存，而采用每次步进4MB的方式进行内存扩容。
+    if (minNewCapacity > threshold) {
+    	//扩容后的新容量
+        int newCapacity = minNewCapacity / threshold * threshold;
+        //新容量大于缓冲区的最大长度，使用maxCapacity做为扩容后的缓冲区容量。
+        if (newCapacity > maxCapacity - threshold) {
+            newCapacity = maxCapacity;
+        } else {
+            newCapacity += threshold;
+        }
+        return newCapacity;
+    }
+
+    // 最小需要的新容量小于阈值，以64为计数进行倍增，直到倍增后的结果大于或者等于需要的容量值。
+    int newCapacity = 64;
+    while (newCapacity < minNewCapacity) {
+        newCapacity <<= 1;
+    }
+
+    return Math.min(newCapacity, maxCapacity);
+}
+```
+
+##### ensureWritable(int minWritableBytes, boolean force)
+
+```
+public int ensureWritable(int minWritableBytes, boolean force) {
+    if (minWritableBytes < 0) {
+        throw new IllegalArgumentException(String.format(
+                "minWritableBytes: %d (expected: >= 0)", minWritableBytes));
+    }
+	//要写的最小容量小于等于当前可写的字节数，说明可写入，返回0。
+    if (minWritableBytes <= writableBytes()) {
+        return 0;
+    }
+	//如果要写入的字节数组大于可动态扩展的最大可写字节数，说明缓冲区无法写入超过最大容量的字节数组。
+    if (minWritableBytes > maxCapacity - writerIndex) {
+        if (force) {
+        		//容量等于最大容量，返回1
+            if (capacity() == maxCapacity()) {
+                return 1;
+            }
+			//扩容成最大容量，返回3
+            capacity(maxCapacity());
+            return 3;
+        }
+    }
+
+    //要写入的字节数虽然大于当前ByteBuf可写的字节数，但是可以通过动态扩展满足新的写入请求，则进行动态扩展。
+    int newCapacity = alloc().calculateNewCapacity(writerIndex + minWritableBytes, maxCapacity);
+
+    //扩展新容量，返回2
+    capacity(newCapacity);
+    return 2;
+}
+```
+
+
 ### AbstractReferenceCountedByteBuf源码解析
 该类主要是对引用进行计数，类似JVM内存回收的对象引用计数器，用于跟踪对象的分配和销毁，做自动内存回收。
 
@@ -336,6 +624,81 @@ discardReadBytes等。
 每调用一次retain方法，引用计数器就加1。
 
 release方法释放引用计数器。
+
+> 源码版本4.1.6.final
+
+
+`private static final AtomicIntegerFieldUpdater<AbstractReferenceCountedByteBuf> refCntUpdater;` 通过原子的方式对成员变量进行更新操作，以实现线程安全，消除锁。
+
+`private volatile int refCnt = 1;` refCnt字段用于跟踪对象的引用次数。
+
+##### retain()
+
+```
+//每调用一次该方法，引用计数器就会加1
+public ByteBuf retain() {
+    return retain0(1);
+}
+```
+
+##### retain0()
+
+```
+private ByteBuf retain0(int increment) {
+    for (;;) {
+    	//当前的引用计数器
+        int refCnt = this.refCnt;
+        //增加之后的引用计数器
+        final int nextCnt = refCnt + increment;
+
+        // Ensure we not resurrect (which means the refCnt was 0) and also that we encountered an overflow.
+        if (nextCnt <= increment) {
+            throw new IllegalReferenceCountException(refCnt, increment);
+        }
+        //CAS增加
+        if (refCntUpdater.compareAndSet(this, refCnt, nextCnt)) {
+            break;
+        }
+    }
+    return this;
+}
+```
+
+``
+
+``
+
+``
+
+``
+
+``
+
+``
+
+``
+
+``
+
+``
+
+``
+
+``
+
+``
+
+``
+
+``
+
+``
+
+``
+
+``
+
+``
 
 ### UnpooledHeapByteBuf源码分析
 UnpooledHeapByteBuf是基于堆内存进行内存分配的字节缓冲区，没有基于对象池，意味着每次I/O的读写都会创建一个新的UnpooledHeapByteBuf，频繁进行大块内存分配和回收会对性能造成影响。
