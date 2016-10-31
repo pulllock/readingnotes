@@ -1081,19 +1081,155 @@ AbstractChannel聚合了所有Channel使用到的能力对象，由AbstractChann
 
 #### 核心源码分析
 
-
 当Channel进行I/O操作时会产生对应的I/O事件，然后驱动事件在ChannelPipeline中传播，由对应的ChannelHandler对事件进行拦截和处理，不关心的事件可以直接忽略。
 
 网络I/O操作直接调用DefaultChannelPipeline的相关方法，由DefaultChannelPipeline中对应的ChannelHandler进行具体的逻辑处理。
 
+```
+public ChannelFuture connect(SocketAddress remoteAddress) {
+    return pipeline.connect(remoteAddress);
+}
+```
+
+
+
 ### AbstractNioChannel源码分析
+
+`private final SelectableChannel ch;` 
 由于Nio Channel，NioSocketChannel，NioServerSocketChannel需要共用，所以定义了一个java.nio.SocketChannel和java.ServerSocketChannel的公共父类SelectableChannel，用于设置参数和I/O操作。
 
-readInterestOp代表了JDK SelectionKey的OP_READ。
+`protected final int readInterestOp;`readInterestOp代表了JDK SelectionKey的OP_READ。
 
 `volatile SelectionKey selectionKey;`是Channel注册到EventLoop后返回的选择键。
 
+`private ChannelPromise connectPromise;`代表连接操作结果。
+
+`private ScheduledFuture<?> connectTimeoutFuture;` 连接超时定时器。
+
+`private SocketAddress requestedRemoteAddress;` 请求的通信地址信息。
+#### 核心API源码分析
+##### doRegister()
+Channel的注册
+
+```
+protected void doRegister() throws Exception {
+	//标识注册操作是否成功
+    boolean selected = false;
+    for (;;) {
+        try {
+        //调用SelectableChannel的register方法，将当前的Channel注册到EventLoop的多路复用器上。
+            selectionKey = javaChannel().register(eventLoop().selector, 0, this);
+            return;
+        } catch (CancelledKeyException e) {
+            if (!selected) {
+                //第一次处理该异常，调用多路复用器的selectNow方法将已经取消的selectionKey从多路复用器中删除掉。
+                eventLoop().selectNow();
+                selected = true;
+            } else {
+                throw e;
+            }
+        }
+    }
+}
+```
+
 ### AbstractNioByteChannel源码分析
+`private Runnable flushTask;` 负责继续写半包消息。
+
+##### doWrite()
+
+```
+protected void doWrite(ChannelOutboundBuffer in) throws Exception {
+    int writeSpinCount = -1;
+
+    boolean setOpWrite = false;
+    for (;;) {
+    	//从发送消息环形数组ChannelOutboundBuffer弹出一条消息
+        Object msg = in.current();
+        if (msg == null) {
+            //为空，说明消息发送数组中所有待发送的消息都已经发送完成，清除半包标识。
+            clearOpWrite();
+            // Directly return here so incompleteWrite(...) is not called.
+            return;
+        }
+
+        if (msg instanceof ByteBuf) {
+            ByteBuf buf = (ByteBuf) msg;
+            int readableBytes = buf.readableBytes();
+            if (readableBytes == 0) {
+                in.remove();
+                continue;
+            }
+
+            boolean done = false;
+            long flushedAmount = 0;
+            if (writeSpinCount == -1) {
+                writeSpinCount = config().getWriteSpinCount();
+            }
+            for (int i = writeSpinCount - 1; i >= 0; i --) {
+                int localFlushedAmount = doWriteBytes(buf);
+                if (localFlushedAmount == 0) {
+                    setOpWrite = true;
+                    break;
+                }
+
+                flushedAmount += localFlushedAmount;
+                if (!buf.isReadable()) {
+                    done = true;
+                    break;
+                }
+            }
+
+            in.progress(flushedAmount);
+
+            if (done) {
+                in.remove();
+            } else {
+                // Break the loop and so incompleteWrite(...) is called.
+                break;
+            }
+        } else if (msg instanceof FileRegion) {
+            FileRegion region = (FileRegion) msg;
+            boolean done = region.transferred() >= region.count();
+
+            if (!done) {
+                long flushedAmount = 0;
+                if (writeSpinCount == -1) {
+                    writeSpinCount = config().getWriteSpinCount();
+                }
+
+                for (int i = writeSpinCount - 1; i >= 0; i--) {
+                    long localFlushedAmount = doWriteFileRegion(region);
+                    if (localFlushedAmount == 0) {
+                        setOpWrite = true;
+                        break;
+                    }
+
+                    flushedAmount += localFlushedAmount;
+                    if (region.transferred() >= region.count()) {
+                        done = true;
+                        break;
+                    }
+                }
+
+                in.progress(flushedAmount);
+            }
+
+            if (done) {
+                in.remove();
+            } else {
+                // Break the loop and so incompleteWrite(...) is called.
+                break;
+            }
+        } else {
+            // Should not reach here.
+            throw new Error();
+        }
+    }
+    incompleteWrite(setOpWrite);
+}
+```
+
 ### AbstractNioMessageChannel源码分析
 AbstractNioMessageChannel和AbstractNioByteChannel的消息发送实现比较相似，不同之处是一个发送的是ByteBuf或者FileRegion，他们可以直接被发送，另一个发送的则是POJO对象。
 
