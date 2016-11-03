@@ -1152,43 +1152,53 @@ protected void doWrite(ChannelOutboundBuffer in) throws Exception {
             // Directly return here so incompleteWrite(...) is not called.
             return;
         }
-
+		//需要发送的消息不为空，继续处理。
+		//需要发送的消息时ByteBuf类型
         if (msg instanceof ByteBuf) {
             ByteBuf buf = (ByteBuf) msg;
             int readableBytes = buf.readableBytes();
+            //可读字节数为0，消息不可读，需要丢弃，从环形发送数组中删除该消息。
             if (readableBytes == 0) {
                 in.remove();
                 continue;
             }
-
+			//消息是否全部发送标识
             boolean done = false;
+            //发送的总消息字节数。
             long flushedAmount = 0;
+            	//循环发送次数为-1，则从Channel配置中获取循环发送次数。
             if (writeSpinCount == -1) {
                 writeSpinCount = config().getWriteSpinCount();
             }
+            //循环发送
             for (int i = writeSpinCount - 1; i >= 0; i --) {
+            		//调用doWriteByte进行消息发送。
                 int localFlushedAmount = doWriteBytes(buf);
+                //如果本次发送的字节数为0，说明发送TCP缓冲区已满
+                //写半包标志设为true，退出循环，释放I/O线程
                 if (localFlushedAmount == 0) {
                     setOpWrite = true;
                     break;
                 }
-
+					//发送的字节数大于0，对发送总数进行计数
                 flushedAmount += localFlushedAmount;
+                //缓冲区没有可读字节，设置发送成功为true，退出循环。
                 if (!buf.isReadable()) {
                     done = true;
                     break;
                 }
             }
-
+			//消息发送完后，更新发送进度信息
             in.progress(flushedAmount);
-
+			//发送成功，从发送数组中删除
             if (done) {
                 in.remove();
             } else {
+            //调用incompleteWrite方法
                 // Break the loop and so incompleteWrite(...) is called.
                 break;
             }
-        } else if (msg instanceof FileRegion) {
+        } else if (msg instanceof FileRegion) {//消息类型是文件类型
             FileRegion region = (FileRegion) msg;
             boolean done = region.transferred() >= region.count();
 
@@ -1229,18 +1239,261 @@ protected void doWrite(ChannelOutboundBuffer in) throws Exception {
     incompleteWrite(setOpWrite);
 }
 ```
+incompleteWrite：处理半包发送任务的方法
+
+```
+protected final void incompleteWrite(boolean setOpWrite) {
+    if (setOpWrite) {
+    	//设置写半包标识
+        setOpWrite();
+    } else {
+        //启动独立的Runnable，加入到EventLoop中执行，由Runnable负责半包消息的发送。
+        Runnable flushTask = this.flushTask;
+        if (flushTask == null) {
+            flushTask = this.flushTask = new Runnable() {
+                @Override
+                public void run() {
+                		//发送缓冲数组中的消息
+                    flush();
+                }
+            };
+        }
+        eventLoop().execute(flushTask);
+    }
+}
+```
+
 
 ### AbstractNioMessageChannel源码分析
 AbstractNioMessageChannel和AbstractNioByteChannel的消息发送实现比较相似，不同之处是一个发送的是ByteBuf或者FileRegion，他们可以直接被发送，另一个发送的则是POJO对象。
+
+```
+protected void doWrite(ChannelOutboundBuffer in) throws Exception {
+    final SelectionKey key = selectionKey();
+    final int interestOps = key.interestOps();
+
+    for (;;) {
+        Object msg = in.current();
+        //消息为空，说明发送缓冲区为空，所有消息都已经被发送完
+        if (msg == null) {
+            // 清除半包标识，退出循环
+            if ((interestOps & SelectionKey.OP_WRITE) != 0) {
+                key.interestOps(interestOps & ~SelectionKey.OP_WRITE);
+            }
+            break;
+        }
+        try {
+            boolean done = false;
+            //循环发送消息
+            for (int i = config().getWriteSpinCount() - 1; i >= 0; i--) {
+                if (doWriteMessage(msg, in)) {
+                    done = true;
+                    break;
+                }
+            }
+
+            if (done) {
+                in.remove();
+            } else {
+                //没有全部被发送出去，设置半包标识，注册SelectionKey.OP_WRITE到多路复用器上，由多路复用器轮询对Channel重新发送尚未发送完全的半包消息。
+                if ((interestOps & SelectionKey.OP_WRITE) == 0) {
+                    key.interestOps(interestOps | SelectionKey.OP_WRITE);
+                }
+                break;
+            }
+        } catch (IOException e) {
+            if (continueOnWriteError()) {
+                in.remove(e);
+            } else {
+                throw e;
+            }
+        }
+    }
+}
+```
 
 ### AbstractNioMessageServerChannel源码分析
 
 ### NioServerSocketChannel源码分析
 
+```
+通过java.net.ServerSocket的isBound方法判断服务端监听端口是否处于绑定状态
+public boolean isActive() {
+    return javaChannel().socket().isBound();
+}
+
+```
+
+```
+protected int doReadMessages(List<Object> buf) throws Exception {
+	//通过ServerSocketChannel的accept接收新的客户端连接
+    SocketChannel ch = javaChannel().accept();
+
+    try {
+    	//如果SocketChannel不为空，利用当前的NioServerSocketChannel，EventLoop和SocketChannel创建新的NioSocketChannel，返回1，表示服务端消息读取成功。
+        if (ch != null) {
+            buf.add(new NioSocketChannel(this, ch));
+            return 1;
+        }
+    } catch (Throwable t) {
+        logger.warn("Failed to create a new channel from an accepted socket.", t);
+
+        try {
+            ch.close();
+        } catch (Throwable t2) {
+            logger.warn("Failed to close a socket.", t2);
+        }
+    }
+
+    return 0;
+}
+```
+
+
 ### NioSocketChannel源码分析
+1. 连接操作
+
+```
+protected boolean doConnect(SocketAddress remoteAddress, SocketAddress localAddress) throws Exception {
+	//本地Socket地址不为空
+    if (localAddress != null) {
+    	//调用SocketChannel.socket().bind()方法绑定本地地址。
+        doBind0(localAddress);
+    }
+	//绑定成功之后继续调用SocketChannel.connect()发起TCP连接。
+    boolean success = false;
+    try {
+        boolean connected = javaChannel().connect(remoteAddress);
+        //暂时没有连接上
+        if (!connected) {
+            selectionKey().interestOps(SelectionKey.OP_CONNECT);
+        }
+        //连接成功，返回true
+        success = true;
+        return connected;
+    } finally {
+        if (!success) {
+            doClose();
+        }
+    }
+}
+```
+
+2. 写半包
+
+```
+protected void doWrite(ChannelOutboundBuffer in) throws Exception {
+    for (;;) {
+        int size = in.size();
+        if (size == 0) {
+            //所有消息都被写完，清除写半包标识
+            clearOpWrite();
+            break;
+        }
+        long writtenBytes = 0;
+        boolean done = false;//发送完成标识
+        boolean setOpWrite = false;//写半包标识
+
+        // Ensure the pending writes are made of ByteBufs only.
+        ByteBuffer[] nioBuffers = in.nioBuffers();
+        int nioBufferCnt = in.nioBufferCount();//需要发送的ByteBuffer数组个数
+        long expectedWrittenBytes = in.nioBufferSize();//需要发送的总字节数
+        SocketChannel ch = javaChannel();//获取SocketChannel
+
+        // Always us nioBuffers() to workaround data-corruption.
+        // See https://github.com/netty/netty/issues/2761
+        switch (nioBufferCnt) {
+            case 0:
+                // We have something else beside ByteBuffers to write so fallback to normal writes.
+                super.doWrite(in);
+                return;
+            case 1:
+                // Only one ByteBuf so use non-gathering write
+                ByteBuffer nioBuffer = nioBuffers[0];
+                for (int i = config().getWriteSpinCount() - 1; i >= 0; i --) {
+                    final int localWrittenBytes = ch.write(nioBuffer);
+                    if (localWrittenBytes == 0) {
+                        setOpWrite = true;
+                        break;
+                    }
+                    expectedWrittenBytes -= localWrittenBytes;
+                    writtenBytes += localWrittenBytes;
+                    if (expectedWrittenBytes == 0) {
+                        done = true;
+                        break;
+                    }
+                }
+                break;
+            default:
+            		//循环发送
+                for (int i = config().getWriteSpinCount() - 1; i >= 0; i --) {
+                		//调用NIO SocketChannel的write方法
+                    final long localWrittenBytes = ch.write(nioBuffers, 0, nioBufferCnt);
+                    //说明TCP发送缓冲区已满，设置半包标识为true，跳出循环
+                    if (localWrittenBytes == 0) {
+                        setOpWrite = true;
+                        break;
+                    }
+                    expectedWrittenBytes -= localWrittenBytes;
+                    writtenBytes += localWrittenBytes;
+                    if (expectedWrittenBytes == 0) {
+                        done = true;
+                        break;
+                    }
+                }
+                break;
+        }
+
+        // Release the fully written buffers, and update the indexes of the partially written buffer.
+        in.removeBytes(writtenBytes);
+
+        if (!done) {
+            // Did not write all buffers completely.
+            incompleteWrite(setOpWrite);
+            break;
+        }
+    }
+}
+```
+
+3. 读写操作
 
 ## Unsafe功能说明
 是Channel接口的辅助接口，不应被用户代码调用。实际的I/O读写操作都是由Unsafe接口负责完成的。
+
+```
+//接收数据的时候，申请ByteBuf
+RecvByteBufAllocator.Handle recvBufAllocHandle();
+//返回本地绑定的Socket地址
+SocketAddress localAddress();
+//返回通信对端的Socket地址
+SocketAddress remoteAddress();
+//注册Channel到EventLoop上，一旦注册完成，通知ChannelFuture
+void register(EventLoop eventLoop, ChannelPromise promise);
+//绑定指定的地址到当前的Channel上，一旦完成，同志ChannelFuture
+void bind(SocketAddress localAddress, ChannelPromise promise);
+//绑定本地地址之后，连接服务端，一旦操作完成，通知ChannelFuture
+void connect(SocketAddress remoteAddress, SocketAddress localAddress, ChannelPromise promise);
+//断开Channel的连接，一旦完成，通知ChannelFuture
+void disconnect(ChannelPromise promise);
+//关闭Channel的连接，一旦完成，通知ChannelFuture
+void close(ChannelPromise promise);
+//强制立即关闭连接
+void closeForcibly();
+//撤销注册，完成后立即通知ChannelPromise
+void deregister(ChannelPromise promise);
+//设置网络操作位为读。用于读取消息
+void beginRead();
+//发送消息，一旦完成，通知ChannelFuture
+void write(Object msg, ChannelPromise promise);
+//将发送缓冲数组中的消息写入到Channel中
+void flush();
+//返回一个特殊的可重用和传递的ChannelPromise，它不用于操作成功或者失败的通知器，仅作为一个容器被使用
+ChannelPromise voidPromise();
+//返回消息发送缓冲区
+ChannelOutboundBuffer outboundBuffer();
+//
+```
 
 ### AbstractUnsafe源码分析
 
