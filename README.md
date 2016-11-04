@@ -65,7 +65,7 @@
 第一遍 完
 
 ## Netty权威指南
-第一遍 15.2.5 PooledByteBuf内存池原理分析
+第一遍 16.4.2 AbstractUnsafe源码分析
 
 ## Java线程（第三版）
 第一遍 完
