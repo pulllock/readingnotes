@@ -1492,10 +1492,51 @@ void flush();
 ChannelPromise voidPromise();
 //返回消息发送缓冲区
 ChannelOutboundBuffer outboundBuffer();
-//
 ```
 
 ### AbstractUnsafe源码分析
+1. register
+register方法主要用于将当前的Unsafe对应的Channel注册到Eventloop的多路复用器上，然后调用DefaultChannelPipeline的fireChannelRegistered方法，如果Channel被激活，则调用DefaultChannelPipeline的fireChannelActive方法。
+
+```
+public final void register(EventLoop eventLoop, final ChannelPromise promise) {
+    if (eventLoop == null) {
+        throw new NullPointerException("eventLoop");
+    }
+    if (isRegistered()) {
+        promise.setFailure(new IllegalStateException("registered to an event loop already"));
+        return;
+    }
+    if (!isCompatible(eventLoop)) {
+        promise.setFailure(
+                new IllegalStateException("incompatible event loop type: " + eventLoop.getClass().getName()));
+        return;
+    }
+
+    AbstractChannel.this.eventLoop = eventLoop;
+    //判断当前线程是否是Channel对应的NioEventLoop线程，如果是同一个线程，则不存在多线程并发操作问题，直接调用register0方法进行注册。
+    if (eventLoop.inEventLoop()) {
+        register0(promise);
+    } else {
+        try {
+            eventLoop.execute(new Runnable() {
+                @Override
+                public void run() {
+                    register0(promise);
+                }
+            });
+        } catch (Throwable t) {
+            logger.warn(
+                    "Force-closing a channel whose registration task was not accepted by an event loop: {}",
+                    AbstractChannel.this, t);
+            closeForcibly();
+            closeFuture.setClosed();
+            safeSetFailure(promise, t);
+        }
+    }
+}
+```
+
 
 ### AbstractNioUnsafe源码分析
 
