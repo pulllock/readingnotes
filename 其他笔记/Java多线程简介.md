@@ -140,3 +140,9 @@ public class CallableAndFutureTest {
     }
 }
 ```
+# 线程间协作
+线程之间的通信协作可以使用Object对象中的wait()方法，notify()方法，notifyAll()方法来实现。
+
+`wait(),wait(long),wait(long,int)` 该方法将当前线程进入休眠状态，wait()方法只能使用在同步方法或者同步块中调用。调用wait()方法后，当前线程释放锁。该线程处于该对象的等待池中。
+
+`notify()，notifyAll()` 该方法用来通知那些可能在等待该对象的对象锁的其他线程。notify()方法必须在同步方法或代码块中调用。被唤醒的对象进入该对象的锁池中，锁池中的线程会去竞争该对象锁。
