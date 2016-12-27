@@ -88,3 +88,67 @@ java.nio.file的服务提供类
 
 ## java.security.spec
 提供了秘钥规范和算法规范的接口和类
+
+## java.sql
+提供了java范围和处理数据源的api
+
+## java.text
+提供了处理文本，日期，数字，信息的类和接口
+
+## java.text.spi
+java.text的服务提供者类
+
+## java.time
+日期，时间，时刻，时间段的主要API
+
+## java.time.chrono
+非ISO日历系统的通用API
+
+## java.time.format
+打印和解析日期时间的类
+
+## java.time.temporal
+使用字段单元和日期时间调整来访问日期和时间
+
+## java.time.zone
+时区及其规则的支持
+
+## java.util
+包含了集合框架，遗留的集合类，时间模型，日期时间工具，国际化，以及其他工具类。
+
+## java.util.concurrent
+并发编程的公共工具类
+
+## java.util.concurrent.atomic
+支持单一变量无锁，线程安全的工具类
+
+## java.util.concurrent.locks
+锁框架
+
+## java.util.function
+微积分表达式，方法引用提供的接口
+
+## java.util.jar
+读写jar文件
+
+## java.util.logging
+日志
+
+## java.util.prefs
+允许应用程序存储并检索用户和系统首选项和配置数据
+
+## java.util.regex
+
+正则表达式
+
+## java.util.spi
+
+java.util包的服务提供者类
+
+## java.util.stream
+
+流，用于新的集合操作等
+
+## java.util.zip
+
+读写zip和gzip
