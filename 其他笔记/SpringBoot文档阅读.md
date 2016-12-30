@@ -1030,3 +1030,221 @@ logging.level.org.hibernate=ERROR
 省略！！！
 
 # 开发web应用
+使用`spring-boot-starter-web`模块。
+
+## Spring Web MVC framework
+### Spring MVC自动配置
+在Spring默认的基础上，自动配置添加了以下特性：
+
+* 加入了`ContentNegotiatingViewResolver`和`BeanNameViewResolver`bean
+* 支持处理静态资源，包括WebJars
+* 自动注册`Converter`，`GenericConverter`，`Formatter`等bean
+* 支持`HttpMessageConverters`
+* 自动注册`MessageCodesResolver`
+* 静态`index.html`的支持
+* 支持自定义`Favicon`
+* 自动使用`ConfigurableWebBindingInitializer`bean
+
+如果想扩展MVC的配置，比如拦截器，格式化，试图控制器等，只需要添加`WebMvcConfigurerAdapter`类型的`@Configuration`类，但是不需要添加`@EnableWebMvc`。
+
+还可以声明`WebMvcRegistrationsAdapter`实例来提供`RequestMappingHandlerMapping`, `RequestMappingHandlerAdapter`, `ExceptionHandlerExceptionResolver`组件。
+
+如果想完全控制Spring MVC，需要自己使用`@Configuration`和`@EnableWebMvc`注解。
+
+### HttpMessageConverters
+Spring MVC使用`HttpMessageConverter`接口转换HTTP的request和response，Objects可以被自动转换成JSON（使用Jackson库），或者转成XML（使用Jsckson或者JAXB）。String默认编码UTF-8。
+
+如果想添加或者自定义转换器，可以使用`HttpMessageConverters`类：
+
+```
+import org.springframework.boot.autoconfigure.web.HttpMessageConverters;
+import org.springframework.context.annotation.*;
+import org.springframework.http.converter.*;
+
+@Configuration
+public class MyConfiguration {
+
+    @Bean
+    public HttpMessageConverters customConverters() {
+        HttpMessageConverter<?> additional = ...
+        HttpMessageConverter<?> another = ...
+        return new HttpMessageConverters(additional, another);
+    }
+
+}
+```
+
+### 自定义JSON序列化和反序列化
+如果使用Jackson处理JSON数据，想使用自己的JsonSerializer和JsonDeserializer类，通常是通过Jackson的模块去做，但是SpringBoot提供了`@JsonComponent`注解来直接注入Bean。
+
+`@JsonComponent`可以直接使用在JsonSerializer或JsonDeserializer的实现上，也可以用在包含两者的内部类的类上：
+
+```
+import java.io.*;
+import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.databind.*;
+import org.springframework.boot.jackson.*;
+
+@JsonComponent
+public class Example {
+
+    public static class Serializer extends JsonSerializer<SomeObject> {
+        // ...
+    }
+
+    public static class Deserializer extends JsonDeserializer<SomeObject> {
+        // ...
+    }
+
+}
+```
+
+所有的ApplicationContext中的`@JsonComponent`bean都会被使用Jackson自动注册。
+
+### MessageCodesResolver
+
+### 静态内容
+默认处理静态内容的目录：`/static`，`/public`，`/resources`，`/META-INF/resources`。使用SpringMVC的`ResourceHttpRequestHandler`来处理，想要修改默认行为需要添加自己的`WebMvcConfigurerAdapter`，然后重写`addResourceHandlers`方法。
+
+默认处理`/**`的资源，可以修改`spring.mvc.static-path-pattern`来改变位置。
+
+`spring.resources.static-locations`修改静态资源的位置。
+
+`/webjars/**`处理Webjars。
+
+程序需要打包成jar的话，不要使用`src/main/webapp`目录，这目录通常在打包成war包的时候使用，对于很多构建工具来说打jar包的时候会忽略此目录。
+
+### 模板引擎
+自动配置支持FreeMarker，Groovy，Thymeleaf，Mustache。如果可能的话，应该避免使用JSP。
+
+默认目录：`src/main/resources/templates`
+
+### 错误处理
+对错误处理有个默认的`/error`映射。想要替换默认的错误处理行为，可以自己实现`ErrorController`来完全替换默认的错误处理。使用`ErrorAttributes`只是替换错误的内容。
+
+自定义错误页面：
+
+404:
+
+```
+src/
+ +- main/
+     +- java/
+     |   + <source code>
+     +- resources/
+         +- public/
+             +- error/
+             |   +- 404.html
+             +- <other public assets>
+```
+
+FreeMarker模板映射所有的5xx错误：
+
+```
+src/
+ +- main/
+     +- java/
+     |   + <source code>
+     +- resources/
+         +- templates/
+             +- error/
+             |   +- 5xx.ftl
+             +- <other templates>
+```
+
+更复杂的应射，自己实现`ErrorViewResolver`接口：
+
+```
+public class MyErrorViewResolver implements ErrorViewResolver {
+
+    @Override
+    public ModelAndView resolveErrorView(HttpServletRequest request,
+            HttpStatus status, Map<String, Object> model) {
+        // Use the request or status to optionally return a ModelAndView
+        return ...
+    }
+
+}
+```
+
+还可以继续使用SpringMVC特性，像`@ExceptionHandler`方法和`@ControllerAdvice`。
+
+### CORS跨域支持
+在controller方法上使用`@CrossOrigin`注解。
+
+全局跨域配置可以注册`WebMvcConfigurer`bean，自定义`addCorsMappings(CorsRegistry)`方法即可。
+
+```
+@Configuration
+public class MyConfiguration {
+
+    @Bean
+    public WebMvcConfigurer corsConfigurer() {
+        return new WebMvcConfigurerAdapter() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                registry.addMapping("/api/**");
+            }
+        };
+    }
+}
+```
+
+## JAX-RS和Jersey
+省略！！！
+
+## 嵌入式servlet容器支持
+Tomcat，Jetty，Undertow。
+
+### 自定义嵌入式servlet容器
+在`application.properties`文件中修改：
+
+* `server.port`端口，`server.address`地址
+* session设置`server.session.persistence`，`server.session.timeout`，`server.session.store-dir`，`server.session.cookie.*`
+* 错误页面`server.error.path`
+* SSL
+* Http压缩
+
+还可以实现`EmbeddedServletContainerCustomizer `接口来实现：
+
+```
+import org.springframework.boot.context.embedded.*;
+import org.springframework.stereotype.Component;
+
+@Component
+public class CustomizationBean implements EmbeddedServletContainerCustomizer {
+
+    @Override
+    public void customize(ConfigurableEmbeddedServletContainer container) {
+        container.setPort(9000);
+    }
+
+}
+```
+
+直接使用`TomcatEmbeddedServletContainerFactory`, `JettyEmbeddedServletContainerFactory` 或`UndertowEmbeddedServletContainerFactory` 来定义：
+
+```
+@Bean
+public EmbeddedServletContainerFactory servletContainer() {
+    TomcatEmbeddedServletContainerFactory factory = new TomcatEmbeddedServletContainerFactory();
+    factory.setPort(9000);
+    factory.setSessionTimeout(10, TimeUnit.MINUTES);
+    factory.addErrorPages(new ErrorPage(HttpStatus.NOT_FOUND, "/notfound.html"));
+    return factory;
+}
+```
+
+# Security
+省略！！！！！！
+
+
+# Sql数据库
+使用`spring.datasource.*`做配置
+
+```
+spring.datasource.url=jdbc:mysql://localhost/test
+spring.datasource.username=dbuser
+spring.datasource.password=dbpass
+spring.datasource.driver-class-name=com.mysql.jdbc.Driver
+```
