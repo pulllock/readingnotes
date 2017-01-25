@@ -335,11 +335,307 @@ option:
 
 ### BTrace动态日志跟踪插件
 
+# 类文件结构
+## Class类文件的结构
+Class文件中只有两种数据类型，无符号数和表。
+
+无符号数属于基本的数据类型，u1，u2，u4，u8分别代表1个字节，2个字节，4个字节，8个字节的无符号数，无符号数可用来描述数字，索引引用，数量值，UTF-8编码构成字符串值。
+
+表是由多个无符号数或者其他表作为数据项构成的复合数据类型，表都以`_info`结尾。
+
+```
+ClassFile {
+
+	u4 magic;
+	
+	u2 minor_version;
+	
+	u2 major_version;
+	
+	u2 constant_pool_count;
+	
+	cp_info constant_pool[constant_pool_count-1];
+	
+	u2 access_flags;
+	
+	u2 this_class;
+	
+	u2 super_class;
+	
+	u2 interfaces_count;
+	
+	u2 interfaces[interfaces_count];
+	
+	u2 fields_count;
+	
+	field_info fields[fields_count];
+	
+	u2 methods_count;
+	
+	method_info methods[methods_count];
+	
+	u2 attributes_count;
+	
+	attribute_info attributes[attributes_count];
+
+}
+```
+
+Class文件本质上就是一张表。
+
+### 魔数与Class文件的版本
+Class文件的头4个字节是魔数，确定这个文件是否能被虚拟机接受。`0xCAFEBABE`。
+
+接着魔术的4个字节是Class文件的版本号，5，6字节是次版本号，7，8字节是主版本号。
+
+### 常量池
+主版本号后面试常量池入口。
+
+常量池中常量的数量是不固定的，所以在常量池入口有一个u2类型的数据，代表常量池容量计数值。
+
+常量池中主要存放两大类常量，字面量和符号引用。字面量接近于Java语言层面的常量概念，如文本字符串，声明为final的常量值等。
+
+符号引用属于编译原理方面的概念，包括以下三类常量：
+
+* 类和接口的全限定名
+* 字段的名称和描述符
+* 方法的名称和描述符
+
+常量池中每一项都是一个表。表开始的第一位是u1类型的标志位tag
+
+### 访问标志
+常量池结束后，紧接着的两个字节代表访问标志access_flags，用于识别类或者接口层次的访问信息。
+
+### 类索引，父类索引与接口索引集合
+类索引`this_class`和父类索引`super_class`都是u2类型的数据，接口索引interfaces是一组u2类型的数据集合，Class文件由这三项数据来确定这个类的继承关系。
+
+都在访问标志之后。
+
+类索引和父类索引用两个u2类型的索引值表示，他们各自指向一个类型为CONSTANT_Class_info的类描述符常量，通过类描述符常量中的索引值可以找到ConSTANT_Utf8_info中的权限定名。
+
+接口索引集合，第一项为u2类型的数据为接口计数器`interfaces_count`。
+
+### 字段表集合
+字段表`field_info`描述接口或者类中声明的变量。字段包括类级变量和实例级变量，但不包括在方法内声明的局部变量。
+
+字段信息包括：
+
+* 作用域public，private，protected修饰符。
+* 实例变量还是类变量static修饰符
+* 可变性final
+* 并发可见性volatile
+* 可否被序列化transient
+* 字段数据类型
+* 字段名称
+
+字段修饰符`access_flags`与类的`access_flags`类似，是一个u2的数据类型。
+
+跟随着`access_flags`标志的是两项索引值，name_index和descriptor_index，是对常量池的引用，对应字段的简单名称和方法的描述符。
+
+描述符用来描述字段的数据类型，方法的参数列表和返回值。基本数据类型以及代表无返回值的void类型都用一个大写字符来表示，对象类型则用字符L加对象的全限定名来表示。
+
+```
+B-byte
+
+C-char
+
+D-double
+
+F-float
+
+I-int
+
+J-long
+
+S-short
+
+Z-boolean
+
+V-void
+
+L-Ljava/lang/Object
+```
+
+数组类型每一维度使用一个前置的`[`来描述，二维数组`[[Ljava/lang/String;`，整形数组`int[]`表示为`[I`
+
+描述符描述方法时，先参数列表后返回值的顺序描述。
+
+```
+void inc()--> ()V
+
+java.lang.String toString()--> ()Ljava/lang/String;
+
+int indexOf(char[] source,int sourceOffset,int sourcrCount,char[] target,int targetOffset,int targetCount,int fromIndex)--> ([CII[CIII)I
+```
+
+字段表集合中不会列出从超类或者父接口继承而来的字段。
+
+### 方法表集合
+方法表结构：
+
+* 访问标志
+* 名称索引
+* 描述符索引
+* 属性表集合
+
+### 属性表集合
+#### Code属性
+方法体中的代码经过编译后，最终变成字节码指令存储在Code属性中。接口和抽象类不需要Code属性。
+
+attribute_name_index是一项指向CONSTANT_Utf8_info型常量的索引。
+
+max_stack操作数栈深度的最大值，虚拟机运行时候需要根据这个值来分配栈帧中的操作栈深度。
+
+max_locals局部变量表所需的存储空间。
+
+code_length代表字节码长度。u4类型，但是虚拟机只是用u2，不允许超过65535条字节码指令。
+
+code存储字节码指令。
+
+#### Exceptions属性
+与Code属性平级。作用是列举出方法中可能抛出的受检查异常。
+
+#### LineNumberTable属性
+描述Java远吗行号与字节码行号对应关系。
+#### LocalVariableTable属性
+描述栈帧中局部变量表中的变量与Java源码中定义的变量之间的关系。
+
+#### SourceFile属性
+Class文件的源码文件名称。
+
+#### ConstantValue
+通知虚拟机自动为静态变量赋值、只有被static修饰的变量才能使用这个属性。
+
+非static类型的实例变量，赋值是在实例构造器`<init>`方法中进行的；对于类变量，有两种方法，在类构造器`<clinit>`方法中或者使用ConstantValue属性。
+
+#### InnerClasses属性
+记录内部类与宿主类之间的关联。
+
+#### Deprecated和Synthethic属性
+Deprecated表示某个类，字段，方法已被标定为不在推荐使用。
+
+Synthethic表示此字段或者方法不是由Java源码直接生成的。
+
+#### StackMapTable
+jdk1.6增加的，位于Code属性表中，会在虚拟机类加载的字节码验证阶段被新类型检查验证器使用。
+
+#### Signature属性
+jdk1.5之后添加，记录泛型签名信息。
+
+#### BootstrapMethods属性
+jdk1.7之后添加，位于类文件属性表中，用于保存invokedynamic指令引用的引导方法限定符。
+
+## 字节码指令简介
+### 加载和存储指令
+用于将数据在栈帧中的局部变量表和操作数栈之间来回传输。
+
+将一个局部变量加载到操作栈：`iload,iload<n>,lload,lload_<n>,fload,fload_<n>,dload,dload_<n>,aload,aload_<n>`
+
+将一个数值从操作数栈存储到局部变量表：`istore,itsore_<n>,lstore,lstore_<n>,fstore,fstore_<n>,dstore,dstore_<n>,astore,astore_<n>`
+
+将一个常量加载到操作数栈：`bipush,sipush,ldc,ldc_w,ldc2_w,aconst_null,iconst_ml,iconst_<i>,lconst_<l>,fconst_<f>,dconst_<d>`
+
+扩充局部变量表的访问索引的指令：`wide`
+
+存储数据的操作数栈和局部变量表主要就是由加载和存储指令进行操作，除此之外，还有少量指令，如访问对象的字段或数组元素的指令也会向操作数栈传输数据。
+
+`iload_<n>`,实际上是代表了一组指令如`iload_0,iload_1,iload_2`，这几组指令都是某个带有一个操作数的通用指令的特殊形式。它们省略掉了显示的操作数，不需要进行取操作数的动作，隐含在了指令中。
+
+### 运算指令
+对两个操作数栈上的值进行某种特定运算，并把结果重新存入到操作栈顶。
+
+加法指令：`iadd,ladd,fadd,dadd`
+
+减法指令：`isub,lsub,fsub,dsub`
+
+乘法指令：`imul,lmul,fmul,dmul`
+
+除法指令：`idiv,ldiv,fdiv,ddiv`
+
+求余指令：`irem,lrem,frem,drem`
+
+取反指令：`ineg,lneg,fneg,dneg`
+
+位移指令：`ishl,ishr,iushr,lshl,lshr,lushr`
+
+按位或指令：`ior,lor`
+
+按位与指令：`iand,land`
+
+按位异或指令：`ixor,lxor`
+
+局部变量自增指令：`iinc`
+
+比较指令：`dcmpg,dcmpl,fcmpg,fcmpl,lcmp`
+
+### 类型转换指令
+可以将两种不同的数值类型进行相互转换。
+
+JVM直接支持一下数值类型的宽化类型转换，小类型向大类型的安全转换：
+
+* int到long，float，double转换
+* long到float，double
+* float到double
+
+处理窄化类型转换必须显式的使用转换指令来完成，指令包括：`i2b,i2c,i2s,l2i,f2i,d2i,d2l,d2f`。
+
+### 对象创建于访问指令
+
+* 创建类实例new
+* 创建数组newarray,anewarray,multianewarray
+* 访问类字段（static字段）和实例字段的指令：getfield,putfield,getstatic,putstatic
+* 把一个数组元素加载到操作数栈的指令baload,caload,saload,iaload,laload,daload,daload,aaload
+* 将一个操作数栈的值存储到数组元素中的指令，bastore,castore,sastore,iastore,fastore,dastore,aastore
+* 取数组长度arraylength
+* 检查类实例类型的指令instanceof，checkcast
+
+### 操作数栈管理指令
+
+* 将操作数栈的栈顶一个或者两个元素出栈pop,pop2
+* 复制栈顶一个或两个数值并将复制值或双份的复制值重新压入栈顶，`dup,dup2,dup_x1,dup2_x1,dup_x2,dup2_x2`
+* 将栈最顶端的两个数值互换swap
+
+### 控制转移指令
+可以让java虚拟机有条件或者无条件的从指定的位置指令，而不是控制转移指令的下一条指令继续执行。
+
+* 条件分支`ifeq,iflt,ifle,ifgt,ifge,ifnull,ifnonnull,if_icmpeq,if_icmpne,if_icmplt,if_icmpgt,if_icmple,if_icmpge,if_acmpeq,if_acmpne`
+* 复合条件分支tableswitch,lookupswitch
+* 无条件分支`goto,goto_w,jsr,jsr_w,ret`
+
+### 方法调用和返回指令
+方法调用指令：
+
+* invokevirtual用于调用对象的实例方法，根据对象的实际类型进行分派
+* invokeinterface调用接口方法，会在运行时搜索一个实现了这个接口方法的对象，找出适合的方法进行调用
+* invokespecial调用一些需要特殊处理的实例方法，包括实例初始化方法，私有方法，父类方法
+* invokestatic调用类方法
+* invokedynamic用于在运行时动态解析出调用点限定符所引用的方法，并执行该方法。
+
+方法返回指令是根据返回值的类型区分的，包括ireturn，lreturn，freturn，dreturn，areturn，还有一个return指令提供声明为void的方法，实例初始化方法以及类和接口的类初始化方法使用。
+
+### 异常处理指令
+显式抛出的异常都由athrow指令来实现。
+
+异常处理现在采用异常表完成，以前采用指令jsr和ret。
+
+### 同步指令
+JVM支持方法级同步和方法内部一段指令序列同步，都是使用管程Monitor来支持。
+
+方法级的同步是隐式的，无需通过字节码指令来控制。JVM可以从方法常量池的方法表结构中的ACC_SYNCHRONIZED访问标志得知一个方法是否是同步方法。
+
+同步一段指令集序列是由synchronized语句块表示，有monitorenter和monitorexit两条指令来支持synchronized关键字的语义。
+
+为了保证方法异常完成时monitorenter和monitorexit指令依然可以正确配对执行，编译器会自动产生一个异常处理器，这个异常处理器可以处理所有异常，目的就是用来执行monitorexit指令。
+
+## 共有设计和私有实现
+## Class文件结构的发展
 
 
 # 虚拟机类加载机制
 
 ## 类加载时机
+生命周期：
+
 * 加载
 * 验证
 * 准备
@@ -347,6 +643,18 @@ option:
 * 初始化
 * 使用
 * 卸载
+
+加载，连接，初始化，其中连接包括验证，准备，解析。
+
+加载阶段JVM虚拟机规范没有进行强制约束。
+
+初始化阶段虚拟机规范严格规定了有且只有5中情况必须立即对类进行初始化：
+
+1. 遇到new，getstatic，putstatic，invokestatic这四条字节码指令时如果类没有初始化，则需要先触发其初始化。生成这4条指令最常见的代码场景是：使用new关键字实例化对象，读取或设置一个类的静态字段（被final修饰已在编译期把结果放入常量池的静态字段除外），调用一个类的静态方法。
+2. 使用java.lang.reflect包的方法对类进行反射调用的时候，如果类没有初始化，需要先触发初始化。
+3. 初始化一个类的时候，发现其父类还没有进行过初始化，需要先触发其父类的初始化。
+4. 虚拟机启动时，用户需要指定一个要执行的主类，虚拟机会先初始化这个主类。
+5. 使用JDK1.7的动态语言支持时，如果java.lang.invoke.MethodHandle实例最后的解析结果是`REF_getStatic,REF_putStatic,REF_invokeStatic`的方法句柄，并且这个方法句柄所对应的类没有进行过初始化，则需要先触发其初始化。
 
 ## 类加载的过程
 
@@ -369,10 +677,14 @@ option:
 4. 符号引用验证
 
 ### 准备
-正式为类变量分配内存并设置类变量初始值,这些内存将在方法区中进行分配
+正式为类变量分配内存并设置类变量初始值,这些内存将在方法区中进行分配。这时候进行内存分配的仅仅包括类变量被static修饰的变量，不包括实例变量。实例变量会在对象实例化时随着对象一起分配在Java堆中。
+
+这里的初始值是数据类型的零值。
+
+如果类字段的字段属性表中存在ConstantValue属性，在准备阶段变量value就会被初始化为ConstantValue属性所指定的值，final修饰的变量。
 
 ### 解析
-虚拟机将常量池内的符号引用替换为直接引用
+虚拟机将常量池内的符号引用替换为直接引用。
 
 * 符号引用
 	
@@ -380,7 +692,9 @@ option:
 	
 * 直接引用
 	
-	直接引用可以是直接指向目标的指针,相对偏移量或是一个能间接定位到目标的句柄.直接引用是与虚拟机实现的内存布局相关的,同一个符号引用在不用虚拟机实例上翻译出来的直接引用一般不会相同.如有直接引用,那引用的目标必定已经存在内存中.
+	直接引用可以是直接指向目标的指针,相对偏移量或是一个能间接定位到目标的句柄.直接引用是与虚拟机实现的内存布局相关的,同一个符号引用在不用虚拟机实例上翻译出来的直接引用一般不会相同.如有直接引用,那引用的目标必定已经存在内存中。
+	
+虚拟机规范中并未规定解析阶段发生的具体时间，只要求在执行anewarray、checkcast、getfield、getstatic、instanceof、invokedynamic、invokeinterface、inovkespecial、invokestatic、invokevirtual、ldc、ldc_w、multianewarray、new、putfield、putstatic这16个用于操作符号引用的字节码指令之前，先对他们所使用的符号引用进行解析。
 
 1. 类或接口的解析
 2. 字段解析
@@ -388,27 +702,33 @@ option:
 4. 接口方法解析
 
 ### 初始化
-初始化阶段是执行类构造器\<clinit>()方法的过程
+初始化阶段才真正开始执行类中定义的Java代码。
 
-* \<clinit>()方法是由编译器自动收集类中的所有类变量的赋值动作和静态语句块中的语句合并产生的,编译器收集的顺序是由语句在源文件中出现的顺序所决定的,静态语句块中只能访问到定义在静态语句块之前的变量,定义在它之后的变量,在前面的静态语句块中可以赋值,但不能访问.
-* \<clinit>()方法与类的构造函数不同,它不需要显式的调用父类构造器,虚拟机会保证子类的\<clinit>()方法执行之前,父类的\<clinit>()已经执行完毕.因此在虚拟机中第一个被执行的\<clinit>()方法的类肯定是java.lang.Object.
-* 由于父类的\<clinit>()方法先执行,也就意味着父类中定义的静态语句块要优先于子类的变量赋值操作.
-* \<clinit>()方法对于类或接口来说并不是必须的,一个类中没有静态语句块,也没有对变量的赋值操作,编译器可以不为这个类生成\<clinit>()方法.
-* 接口中不能使用静态语句块,但是有变量初始化赋值操作,因此接口与类一样都会生成\<clinit>()方法.接口与类不同,执行接口的\<clinit>()方法不需要先执行父接口的\<clinit>()方法,只有当父类接口中定义的变量被使用时,父接口才会被初始化.接口的实现类在初始化时也一样不会执行接口的\<clinit>()方法.
-* 虚拟机会保证一个类的\<clinit>()方法在多线程中被正确的加锁和同步.阻塞!
+初始化阶段是执行类构造器`<clinit>()`方法的过程。
+
+* `<clinit>()`方法是由编译器自动收集类中的所有类变量的赋值动作和静态语句块中的语句合并产生的,编译器收集的顺序是由语句在源文件中出现的顺序所决定的,静态语句块中只能访问到定义在静态语句块之前的变量,定义在它之后的变量,在前面的静态语句块中可以赋值,但不能访问。
+* `<clinit>()`方法与类的构造函数不同,它不需要显式的调用父类构造器,虚拟机会保证子类的`<clinit>()`方法执行之前,父类的`<clinit>()`已经执行完毕.因此在虚拟机中第一个被执行的`<clinit>()`方法的类肯定是java.lang.Object。
+* 由于父类的`<clinit>()`方法先执行,也就意味着父类中定义的静态语句块要优先于子类的变量赋值操作。
+* `<clinit>()`方法对于类或接口来说并不是必须的,一个类中没有静态语句块,也没有对变量的赋值操作,编译器可以不为这个类生成`<clinit>()`方法。
+* 接口中不能使用静态语句块,但是有变量初始化赋值操作,因此接口与类一样都会生成`<clinit>()`方法。接口与类不同,执行接口的`<clinit>()`方法不需要先执行父接口的`<clinit>()`方法,只有当父类接口中定义的变量被使用时,父接口才会被初始化.接口的实现类在初始化时也一样不会执行接口的`<clinit>()`方法。
+* 虚拟机会保证一个类的`<clinit>()`方法在多线程中被正确的加锁和同步.阻塞。
 
 # 类加载器
 * 启动类加载器
 	
-	加载<JAVA_HOME>\lib中的或者被-Xbootclasspath所指定路径的,并且是虚拟机是别的,仅按照文件名,如rt.jar
+	加载`<JAVA_HOME>\lib`中的或者被`-Xbootclasspath`所指定路径的,并且是虚拟机是别的,仅按照文件名,如rt.jar
 	
 * 扩展类加载器
 	
-	加载<JAVA_HOME>\lib\ext中的或者被java.ext.dirs系统变量所指定的类库,开发者可直接使用扩展加载器
+	加载`<JAVA_HOME>\lib\ext`中的或者被`java.ext.dirs`系统变量所指定的类库,开发者可直接使用扩展加载器
 
 * 应用程序类加载器
 	
 	也称为系统类加载器,加载用户类路径(ClassPath)上指定的类库,开发者可以直接使用这个类加载器
+	
+双亲委派模型，要求除了顶层的启动类加载器之外，其余的类加载器都应当有自己的父类加载器。
+
+双亲委派模型的工作过程是：如果一个类加载器收到类加载的请求，他首先不会自己去加载这个类，而是把这个请求委派给父类加载器去完成，每一个层次的类加载器都是如此。只有当父类加载器无法加载请求，子加载器才会尝试自己去加载。
 	
 
 # 虚拟机字节码执行引擎
