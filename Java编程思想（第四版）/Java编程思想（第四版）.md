@@ -150,4 +150,35 @@ static字段对每个类来说都只有一份存储空间，而非static字段�
 javadoc是用于提取注释的工具。
 
 ### 语法
-所有javadoc命令都只能在`/**`注释中出现，结束使用`*/`。
+所有javadoc命令都只能在`/**`注释中出现，结束使用`*/`。使用javadoc的方式有两种：嵌入HTML或使用文档标签。独立文档标签是一些以@字符开头的命令，要在注释内容最前面。
+
+行内文档标签则可出现在javadoc注释中的任何地方，他们也是以@开头，但要在花括号内。
+
+javadoc只能为public何protected成员进行文档注释。
+
+### 嵌入式HTML
+
+### 一些标签示例
+
+@see引用其他类
+
+{@link package.class#member label}该标签与@see极其相似，只是用于行内，并且是label作为超链接文本。
+
+{@docRoot}该标签产生到文档根目录的相对路径，用于文档树页面的显式超链接。
+
+@version版本
+
+@author作者
+
+@since允许指定程序代码最早使用的版本。
+
+@param 用于方法文档
+
+@return 用于方法文档
+
+@throws 异常
+
+@deprecated表示已经过期，不建议使用，jdk1.5中已经被@Deprecated代替。
+
+## 编码风格
+
