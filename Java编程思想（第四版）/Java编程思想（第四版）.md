@@ -759,3 +759,52 @@ finally子句总会执行，所以在一个方法中可以从多个点返回。
 ## 构造器
 ## 异常匹配
 
+# 字符串
+## 不可变String
+String对象是不可变的。每一个看起来会修改String值的方法，实际上是创建了一个全新的String对象，以包含修改后的字符串内容，最初的String对象未改变。
+
+每次把String对象作为方法的参数时，都会复制一份引用。
+
+## 重载"+"与StringBuilder
+String对象是不可变的。
+
+StringBuilder是Jdk1.5引入的，之前是StringBuffer线程安全的。
+
+## 无意识的递归
+
+## String上的操作
+当需要改变字符串的内容时，String类的方法都会返回一个新的String对象。如果内容没有发生变化，String的方法只是返回指向原对象的引用。
+
+## 格式化输出
+### printf()
+### System.out.format()
+### Formatter类
+### 格式化说明符
+%[argument_index$][flags][width][.precision]consoversion
+
+### Formatter转换
+
+### String.format()
+
+## 正则表达式
+### 基础
+一个负号在最前面`-?`
+
+`\d`表示数字
+
+可能有一个负号，后面跟着一位或者多位数字：`-?\\d+`
+
+String自带了split()方法，将字符串从正则表达式匹配的地方切开。
+
+### 创建正则表达式
+。。。
+
+## 扫描输入
+Scanner的构造器可以接受任何类型的输入对象，包括File对象，InputStream，String，Readable对象。
+
+### Scanner定界符
+Scanner根据空白字符对输入进行分词。还可以使用正则表带是来指定自己的所需的定界符。
+
+## StringTokenizer
+可用来分词。基本已经废弃了。
+
