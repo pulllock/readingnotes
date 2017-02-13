@@ -602,3 +602,121 @@ interface关键字产生一个完全抽象的类，没有提供任何具体实�
 ### 内部类与控制框架
 
 ## 内部类的继承
+## 内部类可以被覆盖吗
+如果创建了一个内部类，然后继承其外围类并重新定义此内部类时，并不会起什么作用。
+
+## 局部内部类
+可以在代码块里创建内部类。
+
+## 内部类标识符
+每个类都会产生一个class文件，内部类也会生成，名字是`外围类$内部类：OutClass$InnerClass`。
+
+# 持有对象
+## 泛型和类型安全的容器
+Java5之前容器主要的问题就是，编译器运行你向容器中插入不正确的类型。
+
+当你指定了某个类型作为泛型参数时，并不仅限于只能将缺钱类型的对象放置到容器中，向上转型也可以像作用域其他类型一样作用域泛型。
+
+## 基本概念
+Java容器类库的作用是保存对象。
+
+1. Collection，独立元素序列，这些元素多服从一条或多条规则，List必须按照插入的顺序保存元素，set不能有重复元素，Queue按照排队规则来确定对象产生的顺序。
+2. Map，一组成对的键值对对象，允许使用键来查找值。ArrayList允许用数字查找值，它将数字与对象关联在了一起。映射表允许我们使用零一分对象来查找对象，也被成为关联数组，或者字典。
+
+Collection接口概括了序列的概念，一中存放一组对象的方式。
+
+所有的Collection多可以用foreach语法遍历。
+
+## 添加一组记录
+Arrays.asList()方法接受一个数组或者是一个用逗号分隔的元素列表（使用可变参数），并将其转换为一个List对象。
+
+Collections.addAll()方法接受一个Collection对象，以及一个数组或逗号分隔的列表，将元素添加到Collection中。
+
+Collection的构造器可以接受另外一个Collection，用来将自身初始化，因此可以使用Arrays.asList来为这个构造器产生输入。
+
+Arrays.asList()输出可以直接使用，将其当做List，但在这种情况下，其底层表示的是数组，因此尺寸不能调整。试图调用add()或者delete()会得到不支持的操作的异常。
+
+## 容器的打印
+
+## List
+List将元素维护在特定的序列中。List接口在Collection的基础上添加了大量的方法，使得可以在List的中间插入和移除元素。
+
+* ArrayList，随机访问元素快，在中间插入和删除元素比较慢。
+* LinkedList，中间插入和删除快，提供了优化的顺序访问，随机访问比较慢。
+
+## 迭代器
+迭代器，是一个对象，工作是遍历并选择序列中的对象。
+
+Java的Iterator只能单向移动，只能用来：
+
+1. 使用方法iterator()要求容器返回一个Iterator，Iterator将准备好返回序列的第一个元素。
+2. next()获取序列中下一个元素。
+3. hasNext()检查序列中是否还有元素。
+4. remove()将迭代器新近返回的元素删除。
+
+### ListIterator
+ListIterator是一个更强大的Iterator的子类型，只能用于List类的访问。ListIterator可以双向移动。
+
+可以产生相对于迭代器在列表中指的当前位置的前一个和后一个元素的索引。
+
+可以使用set方法替换访问过的最后一个元素。
+
+通过调用listIterator()方法产生一个指向List开始处的ListIterator。
+
+可以通过调用listIterator(n)来创建一个一开始就指向列表索引为n的元素处的ListIterator。
+
+## LinkedList
+LinkedList和ArrayList一样实现了基本的List接口，但是在中间插入和删除比ArrayList更高效，随机访问操作稍微逊色。
+
+LinkedList还添加了可以使其用作栈，队列，双端队列的方法。
+
+getFirst和element方法，返回列表的头，而不移除它。如果List为空，抛NoSuchElementException。peek方法会在列表为空时返回null。
+
+removeFirst和remove移除并返回列表的头。如果List为空，抛NoSuchElementException。poll方法会在列表为空时返回null。
+
+addFirst和add，addLast将某个元素插入到列表的尾部。
+
+removeLast移除并返回列表的最后一个元素。
+
+## Stack
+栈，通常指后进先出LIFO的容器。
+
+LinkedList具有能够实现栈的所有功能的方法，可以直接将LinkedList作为栈使用。
+
+## Set
+Set不保存重复元素。HashSet专门针对快速查找进行了优化。
+
+Set具有与Collection完全一样接口。没有任何额外的功能，实际上Set就是Collection，只是行为不同。
+
+Set是基于对象的值，来确定归属性的。
+
+TreeSet将元素存储在红黑树数据结构中，HashSet使用散列函数，LinkedSet也使用了散列。
+
+## Map
+可以返回它的键的Set和值的Collection。或者键值对的Set。
+
+## Queue
+队列是先进先出FIFO的容器。
+
+LinkedList提供了方法以支持队列的行为，并且实现了Queue接口，因此LinkedList可以作为Queue的一种实现。
+
+offer方法将元素插入到队尾。
+
+peek和element在不移除的情况下返回队头。队列为空，peek返回null，element抛异常。
+
+poll和remove移除并返回队头，队列为空poll返回null，remove抛异常。
+
+### PriorityQueue
+优先级队列，声明下一个弹出元素是最需要的元素，具有高优先级。
+
+在PriorityQueue上调用offer方法插入对象时，这个对象会在队列中被排序，默认使用自然顺序，还可以通过自己的Comparator来修改顺序。
+
+PriorityQueue可保证调用peek(),poll(),remove()方法时，获取的元素时队列中优先级最高的元素。
+
+## Collection和Iterator
+Collection是描述所有序列容器的共性的根接口。AbstractCollection类提供了Collection的默认实现。
+
+## Foreach与迭代器
+foreach语法主要用于数组，也可以应用于任何Collection对象。
+
+Jdk1.5引入了新接口Iterable，包含一个能够产生Iterator的iterator()方法，并且Iterable接口被foreach用来在序列中移动，任何实现了Iterable的类，都可以将它用于foreach语句中。
