@@ -996,3 +996,135 @@ HashTable与HashMap类似
 继承自Vector
 
 ### BitSet
+
+# Java I/O系统
+## File类
+既能代表文件的名称，也能代表一个目录下一组文件的名称。如果它指的是一个文件集，我们就可以对此集合调用list方法，会返回一个字符数组。
+
+### 目录列表器
+查看目录列表，可以使用两种方法来使用File对象。调用不带参数的list()方法，可以获得此File对象包含的全部列表。如果想要获得受限列表，要用到目录过滤器。
+
+### 目录实用工具
+### 目录的检查及创建
+可以用File对象来创建新的目录或尚不存在的整个目录路径。还可以查看文件的特性，检查某个File对象代表的是一个文件还是目录，可以删除文件。
+
+## 输入和输出
+流，代表任何有能力产出数据的数据源对象或者有能力接收数据的接收端对象。
+
+Java的I/O分为输入和输出两部分。
+
+任何继承自InputStream和Reader的类都含有read()方法，用于读取单个字节或者字节数组。
+
+任何继承自OutputStream和Writer的类都包含有write()方法，用于写单个字节或者字节数组。
+
+### InputStream类型
+ByteArrayInputStream允许将内存的缓冲区当做InputStream使用。
+
+StringBufferInputStream将String转换成InputStream。
+
+FileInputStream从文件中读取信息。
+
+PipedInputStream产生用于写入相关的PipedOutputStream的数据，实现管道化概念。
+
+SequenceInputStream将两个或多个InputStream对象转换成单一的InputStream。
+
+FilterInputStream抽象类，作为装饰器的接口。为其他InputStream类提供有用功能。
+
+### OutputStream类型
+ByteArrayOutputStream在内存中创建缓冲区，所有送往流的数据都要放置在此缓冲区。
+
+FileOutputStream用于将信息写至文件。
+
+PipedOutputStream任何写入其中的信息都会自动作为相关PipedInputStream的输出，实现管道化概念。
+
+FilterOutputStream抽象类，作为装饰器接口。
+
+## 添加属性和有用接口
+### 通过FilterInputStream从InputStream读取数据
+
+* DataInputStream
+* BufferedInputStream
+* LineNumberInputStream
+* PushbackInputStream
+
+### 通过FilterOutputStream向OutputStream写入
+
+* DataOutputStream
+* PrintStream
+* BufferedOutputStream
+
+## Reader和Writer
+提供了兼容Unicode与面向字符的I/O功能。
+
+InputStreamReader可以把InputStream转换为Reader。
+
+OutputStreamWriter可以把OutputStream转换为Writer。
+
+## 自我独立的类：RandomAccessFile
+适用于由大小已知的记录组成的文件，可以使用seek()将记录从一处转移到另一处，然后读取和修改记录。
+
+getFilePointer()用于查找当前所处的文件位置。seek()用于在文件内移至新的位置。length()判断文件的最大尺寸。
+
+RandomAccessFile的大多数功能由nio存储映射文件所取代。
+
+## I/O流的典型使用方式
+### 缓冲输入文件
+如果想要打开一个文件用于字符输入，可以使用以String或File对象作为文件名的FileInputReader，为提高速度，希望对文件进行缓冲，可以将所产生的引用传给BufferedReader。
+
+### 读写随机访问文件
+使用RandomAccessFile。
+
+## 标准I/O
+System.in，System.out，System.err。
+
+## 新N/O
+jdk1.4的java.nio.*包中引入了新的类库。
+
+速度的提高来自于所使用的结构更接近于系统执行I/O的方式，通道和缓冲器。
+
+与通道交互的缓冲器是ByteBuffer。
+
+将字节存放于ByteBuffer的方法之一是使用“put”方法直接进行填充。也可以使用wrap()方法将已存在的字节数组包装到ByteBuffer中。
+
+allocate(),allocateDirect()
+
+ByteBuffer只能保存字节类型的数据。
+
+### 视图缓冲器
+
+### 用缓冲器操纵数据
+想把一个字节数组写到文件中去，应该使用ByteBuffer.wrap()方法把字节数组包装起来，然后用getChannel()方法在FileOutputStream上打开一个通道，接着将来自ByteBuffer的数据写到FileChannel中。
+
+### 缓冲器的细节
+Buffer由四个索引组成：mark标记，position位置，limit界限，capacity容量。
+
+### 内存映射文件
+内存映射文件允许我们创建和修改那些因为太大而不能放入内存的文件。
+
+### 文件加锁
+Java的文件加锁直接映射到本地操作系统的加锁工具。
+
+通过FileChannel调用tryLock或者lock方法，就可以获得整个文件的FileLock。
+
+也可以对文件的一部分进行加锁。
+
+对独占锁或者共享锁的支持必须由底层的操作系统提供。锁的类型可以通过FileLock.isShared()进行查询。
+
+## 压缩
+
+## 对象序列化
+Java对象序列化将那些实现了Serializable接口的对象转换成一个字节序列，并能够在以后将这个字节序列完全恢复为原来的对象。
+
+对象序列化主要为了支持两种特性，一是Java的远程方法调用RMI，二是对JavaBeans来说对象的序列化是必须的。
+
+要序列化一个对象，首先要创建某些OutputStream，然后将其封装在ObjectOutputStream对象内，这时只需要调用writeObject()即可将对象序列化。
+
+### 序列化的控制
+Externalizable对序列化过程进行控制。
+
+#### transient关键字
+将字段关闭序列化。
+
+## XML
+## Preferences
+读取用户的偏好以及程序配置项的设置。
