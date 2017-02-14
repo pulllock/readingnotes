@@ -893,3 +893,106 @@ System.arraycopy();
 
 ### 数组的比较
 equals()元素个数相等，对应位置的元素也相等。
+
+# 容器的深入研究
+Jdk1.5新添加了：
+
+* Queue接口，实现PriorityQueue和各种BlockingQueue。
+* ConcurrentMap接口及实现ConcurrentHashMap，用于多线程机制的。
+* CopyOnWriteArrayList和CopyOnWriteArraySet，用于多线程机制。
+* EnumSet和EnumMap。
+* Collections的多个便利方法。
+
+## 填充容器
+## Collection的功能方法
+Collection中所有的操作也是Set和List中的所有操作，List还有额外功能。Map不是继承自Collection。
+
+## List的功能方法
+## Set和存储顺序
+Set接口，存入Set的每个元素必须是唯一的，Set不保存重复元素。加入Set的元素必须定义equals方法以确保对象的唯一性。Set与Collection有完全一样的接口，Set接口不保证维护元素的次序。
+
+HashSet为快速查找而设计的Set，存入HashSet的元素必须定义hashCode()。
+
+TreeSet保持次序的Set，底层为树结构，元素必须实现Comparable接口。
+
+LinkedHashSet具有HashSet的查询速度，且内部使用链表维护元素的顺序。元素必须定义hashCode()方法。
+
+### SortedSet
+SortedSet的元素可以保证处于排序状态。
+
+## 队列
+Queue在Jdk1.5中仅有的两个实现是LinkedList和PriorityQueue。差异在于排序行为而不是性能。
+
+### 优先级队列
+PriorityQueue。
+
+### 双向队列
+Deque。
+
+## 理解Map
+HashMap，TreeMap，LinkedHashMap，WeakHashMap，ConcurrentHashMap，IdentityHashMap。
+
+### 性能
+HashMap使用了特殊的值，称作散列码，来取代对键的缓慢搜索。HashMap使用对象的hashCode进行快速查询。
+
+HashMap基于散列表的实现，取代了HashTable，插入和查询键值对的开销是固定的，可以通过构造器设置容量和负载因子，以调整容器的性能。
+
+LinkedHashMap类似于HashMap，但是迭代遍历时，取得键值对的顺序是插入次序，只比HashMap慢一点，迭代访问时更快，它使用链表维护内部次序。
+
+TreeMap基于红黑树的实现，结果都是经过排序的。
+
+WeakHashMap弱键映射，允许释放映射所指向的对象。
+
+ConcurrentHashMap一种线程安全的Map，不涉及同步加锁。
+
+IdentityHashMap使用==代替equals()对键进行比较的散列映射。
+
+任何键都必须有一个equals()方法，如果键被用于散列Map，那么还必须有恰当的hashCode方法。如果被用于TreeMap，必须实现Comparable。
+
+### SortedMap
+可以确保键处于排序状态。
+
+### LinkedHashMap
+散列化所有元素，在遍历时，又以元素的插入顺序返回键值对。
+
+## 散列与散列码
+使用自己的类作为HashMap的键，必须同时重载hashCode和equals方法。
+
+### 理解hashCode()
+### 为速度而散列
+散列使得查询得以快速进行。
+
+查询一个值的过程是：首先计算散列码，然后使用散列码查询数组。如果能够保证没有冲突，就有了一个完美的散列函数。通常冲突由外部链接处理，数组并不直接保存值，而是保存值的list，然后对list中的值使用equals方法进行线性查询。
+
+### 覆盖hashCode()
+无论何时，对同一个对象调用hashCode都应该生成同样的值。
+
+String有个特点：如果程序中有多个String对象，都包含相同的字符串序列，那么这些String对象都映射到同一块内存区域。
+
+## 实用方法
+java.util.Collections类的静态方法。
+
+## 持有引用
+java.lang.ref类库包含了一组类，为垃圾回收提供了更大的灵活性。
+
+SoftReference，WeakReference，PhantomReference。
+
+SoftReference可用以实现敏感的高速缓存。
+
+WeakReference不妨碍垃圾回收器回收映射的键或值。
+
+Phantomreference用于调度回收前的清理工作。
+
+### WeakHashMap
+
+## Java1.0/1.1的容器
+### Vector和Enumeration
+Vector与ArrayList类似，Enumeration迭代。
+
+### HashTable
+HashTable与HashMap类似
+
+### Stack
+继承自Vector
+
+### BitSet
