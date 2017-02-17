@@ -113,18 +113,59 @@ final类型的域是不能修改的
 
 # 基础构建模块
 ## 同步容器类
+同步容器类包括Vector和HashTable。这些类实现线程安全的方式是：将他们的状态封装起来，并对每个共有方法都进行同步，是的每次只有一个线程能访问容器状态。
+
 ### 同步容器类的问题
+同步容器类都是线程安全的，但在某些情况下可能需要额外的客户端加锁来保护复合操作。
+
+容器常见的复合操作包括：迭代，跳转，以及条件运算。
+
+### 迭代器与ConcurrentModificationException
+
+### 隐藏迭代器
+加锁可以防止迭代器抛出ConcurrentModificationException。
+
+容器的hashCode和equals等方法会间接的执行迭代操作，当容器作为另一个容器的元素或键值时也会间接的进行迭代操作。containsAll，removeAll，retainAll等。都可能抛出ConcurrentModificationException。
 
 ## 并发容器
+Jdk1.5提供了多种并发容器来改进同步容器的性能。同步容器将所有对容器的访问都串行化，以实现他们的线程安全性。代价是严重降低并发性，吞吐量严重降低。
+
+ConcurrentHashMap代替同步且散列的Map。CopyOnWriteArrayList用于在遍历操作作为主要操作的情况下代替同步List。
+
+新的ConcurrentMap接口中增加了对一些常见复合操作的支持，如：若没有则添加，替换以及有条件删除等。
+
+通过并发容器代替同步容器，可以极大的提高伸缩性并降低风险。
+
+Jdk1.5新增了两种类型的容器：Queue和BlockingQueue。
+
+Queue用来临时保存一组等待处理的元素。实现：ConcurrentLinkedQueue传统的先进先出队列，PriorityQueue，非并发的优先队列。Queue上的操作不会阻塞，如果队列为空，那么获取元素的操作会返回空值。
+
+BlockingQueue扩展了Queue，增加了可阻塞的插入和获取操作。如果队列为空，获取元素的操作将一直阻塞，直到队列中出现一个可用的元素。如果队列已满，那么插入元素的操作将一直阻塞，直到队列出现一个可用空间。
+
+Jdk1.6引入了ConcurrentSkipListMap和ConcurrentSkipListSet，分别作为同步的SortedMap和SortedSet的并发替代品。
 
 ### ConcurrentHashMap
+同步容器类在执行每个操作期间都持有一个锁，其他线程在这段时间内不能访问该容器。
 
-分段锁Lock Stripiing
+ConcurrentHashMap也是基于散列的Map，但是使用了一种完全不同的加锁策略来提供更高的并发性和伸缩性。
 
-提供的迭代器不会抛出ConcurrentModificationException
+ConcurrentHashMap使用分段锁，任意数量的读取线程可以并发的访问Map，执行读取操作的线程和执行写入操作的线程可以并发的访问Map，并且一定数量的写入线程可以并发的修改Map。并发访问环境下实现更高的吞吐量。
+
+提供的迭代器不会抛出ConcurrentModificationException。迭代过程不需要加锁。ConcurrentHashMap的迭代器具有弱一致性，可以容忍并发的修改，当创建迭代器时，会遍历已有元素，并可以在迭代器被构造后将修改反映给容器。
+
+对于size和isEmpty方法返回的不是准确值，而是估计值。
+
+### 额外的原子Map操作
+复合操作，如：若没有则添加，若相等则移除，若相等则替换等，都已经实现为原子操作，并在ConcurrentMap接口中声明。
 
 ### CopyOnWriteArrayList
-写入时复制
+用于代替同步List，某些情况下提供了更好的并发性，迭代期间不需要对容器进行加锁或复制。
+
+写入时复制，每次修改时都会创建并重新发布一个新的容器副本，从而实现可变性。
+
+容器的迭代器保留一个指向底层基础数组的引用。多个线程可以同时对这个容器进行迭代。不会抛出ConcurrentModificationException，返回的元素与迭代器创建时的元素完全一致，不必考虑之后修改操作带来的影响。
+
+每次修改都会复制底层数组。仅当迭代操作远多于修改操作时，采用。比如多事件通知系统。
 
 ## 阻塞队列和生产者-消费者模式
 可阻塞的put和take方法
