@@ -256,6 +256,16 @@ newSingleThreadExecutor 是一个单线程的Executor,它创建单个工作者�
 
 newScheduledThreadPool 创建一个固定长度的线程池,而且以延迟或定时的方式来执行任务,类似于Timer.
 
+## 找出可利用的并行性
+要使用Executor，必须将任务表述成一个Runnable。
+
+可以通过多种方法创建一个Future来描述任务，ExecutorService中的所有submit方法都将返回一个Future，从而将一个Runnable或Callable提交给Executor，并得到一个Future用来获得任务的执行结果或取消任务。还可以显式的为某个指定的Runnable或Callable实例化一个FutureTask。由于FutureTask实现了Runnable，因此可以将它提交给Executor来执行，或者直接调用它的run方法。
+
+### 在异构任务并行化中存在的局限
+只有当大量相互独立且同构的任务可以并发进行处理时，才能体现出将程序的工作负载分配到多个任务中带来的真正性能提升。
+
+### CompletionService：Executor与BlockingQueue
+
 ### Executor的生命周期
 
 ExecutorService添加了一些用于生命周期管理的方法
