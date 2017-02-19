@@ -329,12 +329,36 @@ shutdown和shutdownNow方法
 ### 设置线程池大小
 对于计算密集型的任务，拥有N个处理器，当线程池的大小为N+1时能实现最优的利用率。
 
+对于包含I/O操作或其他阻塞操作的任务，由于线程不会一直执行，因此线程池的规模应该更大。
+
 ## 配置ThreadPoolExecutor
 
+ThreadPoolExecutor的通用构造函数：
+
+```
+public ThreadPoolExecutor(int corePoolSize,int maximumPoolSize,
+								long keepAliveTime, TimeUnit unit,
+								BlockingQueue<Runnable> workQueue,
+								ThreadFactory threadFactory,RejectedExecutionHandler handler){...}
+```
+
 ### 线程的创建与销毁
+线程池的基本大小corePoolSize，就是线程池的目标大小，即在没有任务执行时，线程池的大小，并且只有在工作队列满了的情况下才会创建出这个数量的线程。
+
+线程池的最大大小maximumPoolSize表示可同时活动的线程数量的上限。如果线程的空闲时间超过了存活时间，那么将被标记为可回收的，并且当线程池的当前大小超过了基本大小时，这个线程将被终止。
+
 newFixedThreadPool工厂方法将线程池的基本大小和最大大小设置为参数中指定的值，而且创建的线程池不会超时。
 
 newCachedThreadPool工厂方法将线程池的最大大小设置为Integer.MAX_VALUE，而将基本大小设置为0，并将超时设置为1分钟，线程池可以被无限扩展，并且当需求降低时会自动收缩。
+
+### 管理队列任务
+ThreadPoolExecutor允许提供一个BlockingQueue来保存等待执行的任务，基本的任务排队方法有3种：无界队列，有界队列，和同步移交。
+
+newFixedThreadPool和newSIngleThreadExecutor默认情况下将使用一个无界的LinkedBlockingQueue。如果所有工作者线程都处于忙碌状态，那么任务将在队列中等候。如果任务持续快速的到达，并且超过了线程池处理它们的速度，那么队列将无限制的增加。
+
+有界队列有助于避免资源耗尽的情况发生。
+
+对于非常大的或者无界的线程池，可以通过使用SynchronousQueue来避免任务排队，以及直接将任务从生产者移交给工作者线程。SynchronousQueue不是真正的队列，而是一种在线程之间进行 移交的机制。要将一个元素放入SynchronousQueue中，必须有另一个线程正在等待接受这个元素。
 
 # 显式锁
 ## Lock与ReentrantLock
