@@ -265,6 +265,7 @@ newScheduledThreadPool 创建一个固定长度的线程池,而且以延迟或�
 只有当大量相互独立且同构的任务可以并发进行处理时，才能体现出将程序的工作负载分配到多个任务中带来的真正性能提升。
 
 ### CompletionService：Executor与BlockingQueue
+如果向Executor提交了一组计算任务，并且希望在计算完成后获得结果，
 
 ### Executor的生命周期
 
