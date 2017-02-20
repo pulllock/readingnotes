@@ -364,7 +364,7 @@ newFixedThreadPool和newSIngleThreadExecutor默认情况下将使用一个无界
 ## Lock与ReentrantLock
 Lock提供了一种无条件的，可轮询的，定时的，可中断的锁获取操作，所有加锁和解锁的方法都是显式的。
 
-ReentrantLock实现了Lock接口，提供了与synchronized相同的互斥性和内存可见性。
+ReentrantLock实现了Lock接口，提供了与synchronized相同的互斥性和内存可见性。获取ReentrantLock时，有着与进入同步代码块相同的内存语义，在释放ReentrantLock时有着与退出同步代码块相同的内存语义。
 
 ### 轮询锁与定时锁
 可定时的与可轮询的锁获取模式是由tryLock方法实现的。避免死锁的发生。
@@ -378,23 +378,32 @@ lockInterruptibly方法能够在获得锁的同时保持对中断的响应，由
 ReentrantLock的构造函数提供了两种公平性选择：创建一个非公平的锁（默认），或者一个公平的锁。
 
 ## 读写锁
-ReadWriteLock
+ReadWriteLock，允许多个读操作同时进行，但每次只允许一个写操作。
 
 释放优先，读线程插队，重入性，降级，升级。
 
 ReentrantReadWriteLock为这两种锁都提供了可重入的加锁语义。在构造时可以选择是一个非公平（默认）或者是一个公平的锁。
 
+# 构建自定义的同步工具
+
 ## 显式的Condition对象
 Condition是一种广义的内置条件队列。
 
-要创建一个Condition，可以再相关联的Lock上调用Lock.newCondition方法。
+一个Condition和一个Lock关联在一起，要创建一个Condition，可以再相关联的Lock上调用Lock.newCondition方法。
 
 在每个锁可存在多个等待，条件等待可以是可中断的活不可中断的，基于时限的等待，以及公平的活非公平的队列操作。
 
 Condition对象中与wait，notify和notifyAll方法对应的分别是await，singal和singalAll。
 
+## Synchronizer剖析
+ReentrantLock和Semaphore两个接口存在许多共同点，可以用作一个阀门，每次只允许一定数量的线程通过，当线程达到阀门时，可以通过（在调用lock或acquire时成功返回），也可以等待（在调用lock或acquire时阻塞），还可以取消（在调用tryLock或tryAcquire时返回false），两个接口都可以支持可中断的，不可中断的以及限时的获取操作，并且也都支持等待线程执行公平或非公平的队列操作。
+
 ## AbstrsctQueuedSynchronizer
-AQS
+AQS用于构建锁和同步器的框架。ReentrantLock，Semaphore，CountDownLatch，ReentrantReadWriteLock,SynchronousQueue,FutureTask等都是基于AQS构建的。
+
+## java.util.concurrent同步器类中的AQS
+### ReentrantLock
+ReentrantLock只支持独占方式的获取操作，因此实现了tryAcquire，tryRelease和isHeldExclusively。
 
 # 原子变量与非阻塞同步机制
 
