@@ -97,3 +97,4 @@ WebApplicationContext继承自ApplicationContext，提供了一些web常用的�
 WebApplicationContext被绑定在ServletContext中，如果需要获取可通过RequestContextUtils类中的方法拿到web应用上下文的WebApplicationContext。
 
 ### WebApplicationContext中特殊的bean类型
+DispatcherServlet使用了特殊的bean来处理请求，渲染视图等。如果想指定哪个bean，可在web应用上下文WebApplicationContext中简单的配置他们。
