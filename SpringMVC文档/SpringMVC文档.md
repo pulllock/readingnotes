@@ -187,3 +187,89 @@ headers="myHeader=myValue"
 
 ### 定义@RequestMapping注解的处理方法（handler method）
 #### 支持的方法参数类型
+
+### 使用@RequestParam将请求参数绑定至方法参数
+
+```
+public String setupForm(@RequestParam("petId")){
+
+}
+```
+若参数使用了该注解，则参数默认是必须提供的，但也可以把该参数标注为非必须的，需要将@RequestParam注解的required属性设为false。
+
+### 使用@RequestBody注解映射请求体
+请求体到方法参数的转换是由HttpMessageConvert完成的。
+
+### 使用@ResponseBody注解映射响应体
+@ResponseBody可被应用与方法上，标志该方法的返回值应该被直接写回到HTTP响应体中去。
+
+### 使用@RestController注解创建REST控制器
+结合了@ResponseBody和@Controller。
+
+可与@ControllerAdvice配合使用。
+
+### 使用HTTP实体HttpEntity
+HttpEntity和@ResponseBody，@RequestBody相似，除了能获得请求体和响应体中的内容，还可以存取请求头和响应头。
+
+### 对方法使用@ModelAttribute注解
+@ModelAttribute可被应用在方法或参数上。注解在方法上的@ModelAttribute说明方法的作用是用于添加一个或多个属性到model上。这样的方法能接收与@RequestMapping注解相同的参数类型，只不过不能被直接映射到具体的请求上。在同一个控制器中，@ModelAttribute的方法实际上会在@RequestMapping方法钱被调用。
+
+常用来填充一些公共需要的属性或数据。
+
+一个控制器可以又数量不限的@ModelAttribute方法，多会在@RequestMapping方法之前被调用。
+
+@ModelAttribute注解也可以用在@RequestMapping方法上，这种情况，方法的返回值将会被解释为model的一个属性，而非一个视图名。
+
+### 在方法参数上使用@ModelAttribute
+被注解在参数上，说明了该参数的值将由model中取得，如果model中找不到，会先被实例化，然后被添加到model中。model中存在以后，请求中所有名称匹配的参数多会填充到该参数上。这称为数据绑定。
+
+可以在注解了@ModelAttribute的参数后紧跟着一个BindingResult参数，用于记录数据绑定过程中的错误。
+
+### 在请求间使用@SessionAttributes注解，使用会话保存模型数据
+类级别的@SessionAttributes声明了某个特定处理器所使用的会话属性。
+
+### 使用@CookieValue注解映射cookie值
+@CookieValue注解能将一个方法参数与一个HTTP cookie的值进行绑定。
+
+### 使用@RequestHeader注解映射请求头属性
+@RequestHeader注解能将一个方法参数与一个请求头属性进行绑定。
+
+## 方法参数与类型转换
+从请求参数，路径变量，请求头属性或者cookie中抽取出来的String类型的值，可能需要被转换成其所绑定的目标方法参数或字段的类型。所有简单类型int，long，Date等都有内置实现，想定制转换过程，可以通过WebDataBinder或者为Formatters配置一个FormattingConversionService来做到。
+
+### 定制WebDataBinder的初始化
+想通过Spring的WebDataBinder在属性编辑器中做请求参数的绑定，可以使用在控制器内使用@InitBinder注解的方法，在注解了@ControllerAdvice的类中使用@InitBinder注解的方法，或者提供一个定制的WebBindingInitializer。
+
+#### 数据绑定的定制：使用@InitBinder
+@InitBinder标记的方法，会初始化一个WebDataBinder并用以为处理器方法，填充命令对象和表单对象的参数。
+
+绑定器初始化方法不能有返回值。
+
+### 异步请求的处理
+SpringMVC3.2引入了给予Servlet3的异步请求处理，控制器方法不一定需要返回一个值，可以返回一个Java.util.concurrent.Callable对象，并通过SpringMVC所偶管理的线程来产生返回值。
+
+Callable的异步请求被处理时发生的事件：
+
+* 控制器先返回一个Cllable对象。
+* SpringMVC开始进行异步处理，把该Callable对象交给另一个独立线程的执行器TaskExecutor处理。
+* DispatcherServlet和所有过滤器都退出Servlet容器线程，此时方法的响应对象仍未返回。
+* Callable对象最终产生一个返回结果，此时SpringMVC会重新把请求分派回Servlet容器，恢复处理。
+* DispatcherServlet再次被调用，恢复对Callable异步处理所返回结果的处理。
+
+#### 异步请求的异常处理
+若控制器返回的Callable在执行过程出现异常，会被正常的异常处理流程捕获处理。
+
+#### 拦截异步请求
+HandlerInterceptor可以实现AsyncHandlerInterceptor接口拦截异步请求，在异步请求开始时，被调用的回调方法是afterConcurrentHandlingStarted方法，而非一般的postHandle和afterCompletion方法。
+
+#### HTTP Streaming
+可以让方法返回一个ResponseBodyEmitter类型的对象来实现HTTP Streaming，该对象可被用于发送多个对象。
+
+通常@ResponseBody只能返回一个对象，是通过HttpMessageConverter写到响应体中的。
+
+#### 使用服务端时间推送的HTTP Streaming
+SseEmitter是ResponseBodyEmitter的子类，提供了对服务器端事件推送的技术支持。只需要返回一个SseEmitter对象即可。
+
+#### 直接写回输出流OutputStream的HTTP Streaming
+通过返回一个StreamingResponseBody类型的对象来实现。
+
