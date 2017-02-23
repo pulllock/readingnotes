@@ -273,3 +273,217 @@ SseEmitter是ResponseBodyEmitter的子类，提供了对服务器端事件推送
 #### 直接写回输出流OutputStream的HTTP Streaming
 通过返回一个StreamingResponseBody类型的对象来实现。
 
+## 处理器映射Handler Mappings
+RequestMappingHandlerMapping类会自动查找所有注解了@RequestMapping的@Controller控制器bean。
+
+### 使用HandlerInterceptor拦截请求
+拦截器必须实现HandlerInterceptor接口，定义了三个方法：
+
+* preHandler在处理器执行之前执行，返回一个布尔值，返回true处理器链会继续执行，返回false，DispatcherServlet认为拦截器自身已经完成了对请求的处理，其余的拦截器以及处理器都不会再执行了。
+* postHandler处理器执行完毕之后被执行。
+* afterCompletion在整个请求处理完成之后被执行。
+
+拦截器可通过interceptors属性来配置：
+
+```
+<bean id="handlerMapping" class="org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping">
+    <property name="interceptors">
+        <list>
+            <ref bean="officeHoursInterceptor"/>
+        </list>
+    </property>
+</bean>
+```
+
+HandlerInterceptor的后拦截postHandler方法不一定总是适用与注解了@ResponseBody或ResponseEntity的方法，HttpMessageConverter会在拦截器的postHandler方法被调用之前就把信息写回响应中。拦截器就无法再改变响应了。
+
+## 视图解析
+ViewResolver负责处理视图名与实际视图之间的映射关系。View负责准备请求，将请求的渲染交给某种具体视图技术实现。
+
+### 使用ViewResolver接口解析视图
+所有控制器的处理方法都必须要返回一个逻辑视图的名字。Spring中的视图有一个视图名标识，并由视图解析器来渲染。
+
+视图解析器：
+
+- AbstractCachingViewResolver，抽象视图解析器，提供了缓存视图功能。
+- XmlViewResolver该类接收一个xml格式的配置文件。默认的配置文件名是`/WEB-INF/views.xml`
+- ResourceBundleViewResolver，采用bundle根路径所指定的ResourceBundle中的bean定义作为配置。一般bundle都定义在classpath路径下的配置文件中，默认为views.properties。
+- UrlBasedViewResolver，直接使用URL来解析到逻辑视图名。
+- InternalResourceViewResolver，URLBasedViewResolver的子类，支持内部资源视图，如Servlet和JSP，以及诸如JstlView和TitlesView等类的子类。
+- VelocityViewResolver/FreeMarkerViewResolver，支持Velocity和FreeMarker视图。
+- ContentNegotiatingViewResolver，ViewResolver的实现，根据所请求的文件名或请求的Accept头来解析一个视图。
+
+假设使用JSP视图技术，可以使用一个基于URL的视图解析器UrlBasedViewResolver，视图解析器会将URL解析成一个视图名，并将请求转交给请求分发器进行视图渲染：
+
+```
+<bean id="viewResolver" class="org.springframework.web.servlet.view.UrlBasedViewResolver">
+    <property name="viewClass" value="org.springframework.web.servlet.view.JstlView"/>
+    <property name="prefix" value="/WEB-INF/jsp/"/>
+    <property name="suffix" value=".jsp"/>
+</bean>
+```
+若返回一个test，会去交给`/WEB-INF/jsp/test.jsp`去渲染。
+
+如果需要使用多种不同的视图技术，可以使用ResourceBundleViewResolver：
+
+```
+<bean id="viewResolver"
+        class="org.springframework.web.servlet.view.ResourceBundleViewResolver">
+    <property name="basename" value="views"/>
+    <property name="defaultParentView" value="parentView"/>
+</bean>
+```
+ResourceBundleViewResolver会检索由bundle根路径下所配置的ResourceBundle，对每个视图，视图类由`[viewname].class`属性的值指定，视图url由`[viewname].url`属性的值指定。
+
+### 视图链
+Spring支持同时使用多个视图解析器，可以配置一个解析器链。如果需要指定次序，需要设置order属性，属性值越大，视图解析器在链中的位置越靠后。
+
+下面包含了两个解析器，InternalResourceViewResolver，总是被自动的放置在解析器链的最后。另一个是XMLViewResolver，用来指定Excel视图。InternalResourceViewResolver不支持Excel视图。
+
+```
+<bean id="jspViewResolver" class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+    <property name="viewClass" value="org.springframework.web.servlet.view.JstlView"/>
+    <property name="prefix" value="/WEB-INF/jsp/"/>
+    <property name="suffix" value=".jsp"/>
+</bean>
+
+<bean id="excelViewResolver" class="org.springframework.web.servlet.view.XmlViewResolver">
+    <property name="order" value="1"/>
+    <property name="location" value="/WEB-INF/views.xml"/>
+</bean>
+```
+如果视图解析器不能返回视图，Spring会继续在上下文查找其他视图，直到产生一个视图返回，如果最后不能返回，会抛异常。
+
+### 视图重定向
+控制器返回一个视图名，视图解析器会解析到具体的视图技术上去渲染。
+
+JSP解析过程通常是由InternalResourceViewResolver和InternalResourceView协作完成，可能会发生内部转发forward或引用include。
+
+Velocity和XSLT等视图本身内容是直接被写回响应流中的。
+
+## 使用FlashAttributes
+提供了一个请求为另一个请求存储有用属性的方法，在重定向的时候最常使用。FlashAttributes会在重定向前被暂时的保存起来，通常是在session中，重定向后会重新被下一个请求取用并立即从原保存中移除。
+
+FlashMap用来存储flash属性。FlashMapManager来存储，取回，管理FlashMap实例。
+
+控制器不需要直接接触FlashMap，一般是通过@RequestMapping方法去接收一个RedirectAttributes类型的参数，然后直接添加flash属性。
+
+## URI构造
+## 地区信息
+## 主题
+## Spring的multipart支持
+Spring内置对多路上传的支持。MultipartResolver提供对多路上传的支持。
+
+### 使用MultipartResolver与CommonsFileUpload传输文件
+
+```
+<bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+    <!-- 支持的其中一个属性，支持的最大文件大小，以字节为单位 -->
+    <property name="maxUploadSize" value="100000"/>
+</bean>
+```
+
+当Spring的DispatcherServlet检测到一个多部分请求时，会激活在上下文中声明的多路解析器，并把请求交给它。解析器会把HttpServletRequest包装成一个MultipartHttpServletRequest。
+
+## 异常处理
+### 处理器异常解析器HandlerExceptionHandler
+实现HandlerExceptionResolver接口。
+
+注解@ExceptionHandler到方法上。
+
+### @ExceptionHandler注解
+
+### 使用@ResponseStatus注解业务异常
+
+## Web安全
+
+## HTTP缓存直播
+它主要是与HTTP的响应头Cache-Control相关
+
+## 基于代码的Servlet容器初始化
+在Servlet3.0以上的环境下，可以通过编程方式来配置Servlet容器。
+
+```
+import org.springframework.web.WebApplicationInitializer;
+
+public class MyWebApplicationInitializer implements WebApplicationInitializer {
+
+    @Override
+    public void onStartup(ServletContext container) {
+        XmlWebApplicationContext appContext = new XmlWebApplicationContext();
+        appContext.setConfigLocation("/WEB-INF/spring/dispatcher-config.xml");
+
+        ServletRegistration.Dynamic registration = container.addServlet("dispatcher", new DispatcherServlet(appContext));
+        registration.setLoadOnStartup(1);
+        registration.addMapping("/");
+    }
+
+}
+```
+WebApplicationInitializer能保证配置能被自动检测并应用与Servlet3容器中。
+
+AbstractDispatcherServletInitializer是WebApplicationInitializer的实现。
+
+```
+public class MyWebAppInitializer extends AbstractAnnotationConfigDispatcherServletInitializer {
+
+    @Override
+    protected Class<?>[] getRootConfigClasses() {
+        return null;
+    }
+
+    @Override
+    protected Class<?>[] getServletConfigClasses() {
+        return new Class[] { MyWebConfig.class };
+    }
+
+    @Override
+    protected String[] getServletMappings() {
+        return new String[] { "/" };
+    }
+
+}
+```
+上面适用于基于Java配置的Spring应用。
+
+如果使用基于XML的配置方式：
+
+```
+public class MyWebAppInitializer extends AbstractDispatcherServletInitializer {
+
+    @Override
+    protected WebApplicationContext createRootApplicationContext() {
+        return null;
+    }
+
+    @Override
+    protected WebApplicationContext createServletApplicationContext() {
+        XmlWebApplicationContext cxt = new XmlWebApplicationContext();
+        cxt.setConfigLocation("/WEB-INF/spring/dispatcher-config.xml");
+        return cxt;
+    }
+
+    @Override
+    protected String[] getServletMappings() {
+        return new String[] { "/" };
+    }
+
+}
+```
+
+AbstractDispatcherServletInitializer同样也提供了便捷的方式来添加过滤器Filter实例并使他们自动被映射到DispatcherServlet下：
+
+```
+public class MyWebAppInitializer extends AbstractDispatcherServletInitializer {
+
+    // ...
+
+    @Override
+    protected Filter[] getServletFilters() {
+        return new Filter[] { new HiddenHttpMethodFilter(), new CharacterEncodingFilter() };
+    }
+
+}
+```
+
+## 配置SpringMVC
