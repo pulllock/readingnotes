@@ -285,6 +285,93 @@ public class Client {
         }
     }
 }
-
 ```
 运行即可显示，还可以部署到其他的机器上，在局域网中尝试运行。
+
+## SPI扩展机制
+
+SPI被框架的开发人员使用，框架开发者定义一个接口，给出几个默认实现类，同时允许框架的使用者也能自己定义接口的实现来进行扩展。
+
+Java中SPI的约定：当提供了服务接口的一种实现之后，在classpath下面的`META-INF/services/`目录下创建一个以服务接口命名的文件，该文件里面就是实现该服务接口的具体实现类。当外部程序装配这个模块的时候，通过该配置文件就能找到具体的实现类名，进行装载实例化，完成模块的注入。载入类可以使用JDK中的标准工具类ServiceLoader。
+
+### 具体应用
+apache在common-logging中，是使用的SPI，只有接口，没有实现，具体的实现方案由提供商实现。发现日志的提供商是通过扫描`META-INF/services/org.apache.commons.logging.LogFactory`配置文件，通过该配置文件内容找到提供商实现类，只要我们的日志实现里包含这个文件，并在文件里定制LogFactory工厂接口的实现类即可。
+
+jdbc4也基于spi的机制来发现驱动提供商，可以通过`META-INF/services/java.sql.Driver`文件里指定的实现类方式来暴露驱动提供者。
+
+### ServiceLocator缺点
+ServiceLocator算是延迟加载，但是基本只能通过全部遍历获取，接口的实现类全部加载并实例化。容易造成浪费。
+
+获取某个实现类的方式不够灵活，只能通过Iterator形式获取，不能根据某个参数来获取对应的实现类。
+
+## dubbo的扩展机制
+dubbo的扩展和Java的SPI类似，但是增加了新功能：
+
+- 可以方便的获取某一个想要的扩展实现。
+- 对扩展实现IOC依赖注入功能。
+- 对扩展采用装饰器模式进行功能增强，类似AOP实现的功能。
+
+## dubbo与Spring接入
+dubbo可以不依赖于Spring运行。
+
+dubbo与Spring的集成是通过Spring的schema扩展进行加载。
+
+### Spring的schema扩展
+
+- 编写自定义的类
+- 编写xml schema来描述自定义元素
+- 编写NamespaceHandler的实现类
+- 编写BeanDefinitionParser的实现类
+- 将定义的实现类和xsd文件配置到`spring.handlers`和`spring.schemas`中
+
+NamespaceHandler用于解析自定义名字空间下的所有元素，NamespaceHandler中有三个方法：
+
+- init()会在NamespaceHandler初始化的时候调用。
+- BeanDefine parse(Element,ParserContext)当Spring遇到顶层元素的时候调用。
+- BeanDefinitionHolder decorate(Node,BeanDefinitionHolder,ParserContext)当Spring遇到一个属性或嵌套元素的时候调用。
+
+BeanDefinitionParser用来解析元素，得到相应的属性然后设置到bean中。
+
+`spring.handlers`中包含xml schema uri和handler类的映射关系。
+
+`spring.schemas`中包含xsd文件和schema uri的对应关系。
+
+### Spring解析
+使用dubbo时，通常配置文件都会这样写：
+
+```
+......
+<dubbo:application name="dubbo-provider" />
+<dubbo:registry  protocol="zookeeper" address="127.0.0.1:2181" />
+<dubbo:protocol name="dubbo" port="20880" />
+......
+```
+
+Spring在解析标签的时候，遇到dubbo的标签之后会发现这是自定义的标签，就会开始自定义标签的解析过程。解析分为3步：
+
+1. 获取配置文件的命名空间。
+2. 根据命名空间获取对应的Handler。
+3. 通过Handler调用自定义标签的解析逻辑。
+
+#### 获取配置文件的命名空间
+由Spring进行解析，遇到dubbo标签后，会首先解析dubbo的命名空间。
+
+#### 获取Handler
+解析完命名空间之后，得到namespaceUri，然后根据uri去到`META-INF/Spring.handler`下查找handler映射，这时就找到我们自定义的Handler类了。
+
+#### 调用自定义标签的解析逻辑
+在获取Handler的时候，如果不存在当前Handler，就去实例化，并且调用init()方法，init方法中调用父类的registerBeanDefinitionParser方法进行自定义标签的解析。init方法就是预留的注册自定义解析器的接口。`registerBeanDefinitionParser(String elementName, BeanDefinitionParser parser)`elementName就是我们自定义的标签名，后面的BeanDefinitionParser就是我们自定义的标签解析器。
+
+到这里就开始dubbo的自定义逻辑了，也就建立了跟spring的关联。
+
+在dubbo-config-spring项目中可找到`dubbo.xsd,spring.handlers,spring.schemas`这几个文件。
+
+spring.handlers：
+
+```
+http\://code.alibabatech.com/schema/dubbo=com.alibaba.dubbo.config.spring.schema.DubboNamespaceHandler
+```
+
+DubboNamespaceHandler类就是我们解析的入口。
+
+
