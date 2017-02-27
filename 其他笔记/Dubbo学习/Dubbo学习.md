@@ -14,6 +14,21 @@ Provider和Consumer是必须存在的，Provider是暴露服务的服务提供�
 - 消费方需要调用服务时，从内存中拿到上次通知的所有存活的服务地址，根据路由信息和负载均衡选择调用的服务地址，发起调用。
 - 通过filter分别在客户端发送请求钱和服务端接收请求后，通过异步记录信息，发送到monitor做监控和统计。
 
+## provider启动过程
+配合Spring使用：
+
+1. 用户启动Spring容器。
+2. Spring容器使用dubbo的标签解析器解析dubbo的配置文件。
+3. dubbo的标签解析器解析完成会后，将配置文件封装成ServiceConfig。
+4. Spring容器执行ServiceConfig的export方法。
+5. export方法绑定ip，端口，启动netty服务器。
+6. Spring容器暴露服务监听器。
+7. 服务监听器注册服务到注册中心。
+
+## consumer启动过程
+配合Spring使用：
+......
+
 # 注册中心
 Dubbo支持四种注册中心，Multicast注册中心，Zookeeper，redis，Simple注册中心。
 
@@ -360,7 +375,7 @@ Spring在解析标签的时候，遇到dubbo的标签之后会发现这是自定
 解析完命名空间之后，得到namespaceUri，然后根据uri去到`META-INF/Spring.handler`下查找handler映射，这时就找到我们自定义的Handler类了。
 
 #### 调用自定义标签的解析逻辑
-在获取Handler的时候，如果不存在当前Handler，就去实例化，并且调用init()方法，init方法中调用父类的registerBeanDefinitionParser方法进行自定义标签的解析。init方法就是预留的注册自定义解析器的接口。`registerBeanDefinitionParser(String elementName, BeanDefinitionParser parser)`elementName就是我们自定义的标签名，后面的BeanDefinitionParser就是我们自定义的标签解析器。
+在获取Handler的时候，如果不存在当前Handler，就去实例化，并且调用init()方法，init方法会把所有的自定义标签的Handler都加载，init方法中调用父类的registerBeanDefinitionParser方法进行自定义标签的解析。init方法就是预留的注册自定义解析器的接口。`registerBeanDefinitionParser(String elementName, BeanDefinitionParser parser)`elementName就是我们自定义的标签名，后面的BeanDefinitionParser就是我们自定义的标签解析器。
 
 到这里就开始dubbo的自定义逻辑了，也就建立了跟spring的关联。
 
@@ -373,5 +388,24 @@ http\://code.alibabatech.com/schema/dubbo=com.alibaba.dubbo.config.spring.schema
 ```
 
 DubboNamespaceHandler类就是我们解析的入口。
+
+## <dubbo:application/>
+应用信息配置：
+
+name，当前应用名称。
+
+version，应用版本
+
+owner，应用负责人
+
+organization，组织名称，用于注册中心来区分服务来源
+
+architecture，用于服务分层对应架构
+
+environment，应用环境
+
+compiler，java字节码编译器，用于动态类的生成
+
+logger，日志输出方式
 
 
