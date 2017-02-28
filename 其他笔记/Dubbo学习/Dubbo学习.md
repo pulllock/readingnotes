@@ -408,5 +408,11 @@ compiler，java字节码编译器，用于动态类的生成
 
 logger，日志输出方式
 
+## 补充Spring的知识
 
+Bean的生命周期
+
+IOC容器的初始化过程
+
+Spring事件机制
 
