@@ -127,7 +127,7 @@ protected final void refreshBeanFactory() throws BeansException {
 		throw new ApplicationContextException("I/O error parsing bean definition source for " + getDisplayName(), ex);
 	}
 }
-``
+```
 
 对BeanDefinition的载入，loadBeanDefinitions方法：
 
