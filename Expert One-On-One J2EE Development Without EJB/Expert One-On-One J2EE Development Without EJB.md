@@ -192,7 +192,143 @@ FactoryBean接口中getObject方法用于返回被创建的对象，isSingleton�
 ### 获取JNDI资源
 ### 创建本地连接工厂
 
+## Spring应用上下文
+拥有bean工厂的全部能力之外，应用上下文还具有以下功能：
 
+- 支持不同信息源，可以使用统一的方式获取本地化信息，不依赖于底层的信息来源。默认是从资源绑定中读取信息。
+- 访问文件资源。
+- 支持应用事件，提供了一个Observer设计模式的实现，可以讲应用事件发布到预先注册的应用监听器上，从而避免了发送者和接受者之间的耦合。监听器还可以获取应用上下文生命周期的事件通知。AOP可以作为事件-监听机制的替代品。
+
+应用上下文的核心接口是ApplicationContext，它继承了ListableBeanFactory，因此应用代码可以吧ApplicationContext当做BeanFactory来用。
+
+应用上下文是应用程序的中心注册机构，允许嵌套，从根上下文开始，可以建立一个应用上下文树。bean的查找首先检查当前的上下文，然后是父上下文，以此类推。
+
+WebApplicationContext继承了ApplicationContext，是一个专门用于web环境的子接口，其中提供了一个方法用于获得当前的ServletContext对象。
+
+现成的ApplicationContext实现有：
+
+- FileSystemXmllApplicationContext
+- ClassPathXmlApplicationContext
+- XmlWebApplicationContext
+
+### 生命周期回调
+应用上下文是bean工厂，就提供了生命周期回调操作，包括InitializingBean和DisposableBean接口、声明性的初始化和销毁方法以及BeanFactoryAware接口等。
+
+bean组件想要获得自己所在的应用上下文，可以实现ApplicationContextAware接口，在初始化的时候回调setApplicationContext方法，将会接收到一个ApplicationContext的引用。
+
+如果bean组件同时还实现了BeanFactoryAware接口，则会首先调用BeanFactoryAware的setBeanFactory方法，然后调用setApplicationContext方法。
+
+Spring内部很多都实现了ApplicationContextAware接口，实现这个接口有两个目的：访问信息源，访问文件资源。
+
+其实还可以实现其他专用接口，比如ResourceLoaderAware接口，不必实现ApplicationContextAware接口。
+
+ServletContextAware接口，可以获得ServletContext对象的引用。
+
+WebApplicationContext接口本身也提供了getServletContext方法来获取ServletContext引用。
+
+### 信息源
+除了BeanFactory接口以外，ApplicationContext还继承了MessageSource接口，该接口提供了多个用于获取信息字符串的getMessage方法。
+
+如果一个对象实现了MessageSourceResolvable接口，也可以直接将其传入getMessage方法。
+
+### 文件资源
+应用上下文一个重要的特性是可以通用的访问文件资源。ApplicationContext接口继承了ResourceLoader接口，后者的getResource方法可以根据给出的路径返回一个实现了Resource接口的对象，通过它的getInputStream和getFile方法可以统一访问背后的文件资源。
+
+Resource实现：
+
+- ClassPathResource
+- FileSystemResource
+- ServletContextResource
+
+### Bean Factory后处理
+应用上下文允许在底层bean工厂读取bean声明以后进行后处理post-process。最常见的就是bean组件在xml文件中声明，可以对他们进行后处理，覆盖属性的值，或是为某些属性提供占位值。
+
+bean实现BeanFactoryPostProcessor接口即可，当应用上下文启动时，它们会首先被调用，因此可以动态改变其他bean的声明。
+
+现成的实现，PropertyOverrideConfigurer，读取属性文件中beanName.propertyName=value格式的内容，并覆盖bean属性的值。
+
+另一个实现，PropertyPlaceholderConfigurer，可以解析ant风格的占位符。
+
+# 机遇AOP概念的声明性中间件
+## AOP
+### 定义
+
+- 关注点concern，关注点可以是一个特定的问题、概念、或者是应用程序的兴趣区间。
+- 横切关注点crosscutting concern，一个关注点的实现代码，散落在很多个类或方法之中，就称为横切关注点。
+- 方面aspect，方面是对一个横切关注点的模块化，将那些散落在各处的用于实现这个关注点的代码规整到一处。
+- 连接点join point，程序执行过程中的一点，如：
+
+	+ 方法调用method invocation，对方法的调用。
+	+ 字段访问field access，读写实例变量。
+	+ 异常抛出throws，特定的异常抛出。
+
+- 增强advice，在特定连接点执行的动作。
+- 切入点pointcut，一组连接点的总称，用于指定某个增强应该在何时被调用。
+- 引介introduction，为一个现有的Java类或者接口添加方法或字段。
+- 混入继承mixin inheritance，一个混入类封装了一组功能，这组功能可以被混入到现有的类中。
+- 织入weaving，将方面整合到完整的执行流程中。
+- 前增强before pre，在连接点调用之前，首先调用增强。
+- 后增强after post，在连接点调用之后，在调用增强。
+- 环绕增强around，可以完全控制执行流程。
+
+切入点可分为静态标准切入点和动态标准切入点。静态的根据部署阶段的信息选择增强，比如拦截特定类的所有的getter方法，动态点根据运行时信息选择增强，比如某方法返回值为null，则将其纳入某切入点。
+
+AOP中的常用术语：
+
+- 拦截器interceptor，用来在字段和方法的拦截。
+- AOP代理AOP proxy，被增强的对象的引用。
+- 目标对象target object，位于拦截器链末端的对象实例。
+
+## AOP实现策略
+### 动态代理
+动态代理可以使我们为一个或多个接口凭空的创建实现对象，而不需要预先有一个实现类。
+
+好处，Java的语言特性，不需要第三方类库。
+
+缺点，只能针对接口进行代理，不能针对类。
+
+对接口进行代理时，Spring默认使用动态代理。
+
+### 动态字节码生成
+针对Java类的代理，可以使用动态字节码生成。CGLIB，Spring中针对类的代理就是使用CGLIB。它可以针对指定的类动态的生成一个子类，覆盖其中的方法，从而实现方法拦截。
+
+CGLIB是通过继承来实现代理，无法为final方法提供代理。
+
+### Java代码生成
+生成新的Java源码。
+
+### 使用定制的类加载器
+希望对某个类的所有实例进行增强，可以改变new操作符的行为，可以考虑利用Java类加载机制的可扩展性。
+
+### 语言扩展
+AspectJ对Java进行了扩展。
+
+## AOP实现
+
+### AspectJ
+### AspectWerkz
+### JBoss4
+### Spring
+Spring AOP将AOP支持与Spring轻量级容器基础设施整合在一起，并将Spring提供的服务与AOP组合起来。
+
+Spring AOP功能包括：
+- 支持对方法调用进行各种类型的增强，包括环绕增强、前增强、后增强、抛出增强，可以针对接口增强，也可以针对类增强。
+- 支持引介和混入，拦截器可以是无状态的，也可以是有状态的，取决于配置的方式。
+- 富有表现力并且可扩展的切入点模型，支持正则表达式，支持切入点组合。
+- 支持控制流切入点。
+- 通过提供适配器类，可以轻松加入任意类型的增强，不必修改核心框架。
+- 代理可通过编程驱动，也可以通过配置驱动。
+    
+### Nanning
+### AOP联盟
+
+## Spring中的AOP实践
+### 使用ProxyFactoryBean
+Spring创建AOP代理的基本途径是使用ProxyFactoryBean。步骤：
+
+- 将必要的切入点、拦截器或其他形式的增强以对象的形式在上下文中声明。
+- 在应用上下文中声明一个将要被增强的目标对象。
+- 创建一个ProxyFactoryBean实例，它将顶替目标对象被用户使用。
 
 
 
