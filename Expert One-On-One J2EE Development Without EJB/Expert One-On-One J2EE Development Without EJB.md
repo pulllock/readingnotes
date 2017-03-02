@@ -330,15 +330,102 @@ Spring创建AOP代理的基本途径是使用ProxyFactoryBean。步骤：
 - 在应用上下文中声明一个将要被增强的目标对象。
 - 创建一个ProxyFactoryBean实例，它将顶替目标对象被用户使用。
 
+# 事务管理
+## Spring的事务管理
+### 事务声明
+TransactionDefinition是一个接口类，允许以不同的方式来定义事务的属性。
+
+事务传播类型：
+
+- required，运行在当前事务的范围内，如果没有启动事务，就创建一个新的事务。
+- supports，运行在当前事务范围内，如果当前没有启动事务，就不在事务范围内执行。
+- mandatory，运行在当前的事务范围内，如果当前没有启动事务，就抛异常。
+- requires new，创建一个新的事务，如果当前启动了事务，就挂起当前事务。
+- not support，不在事务范围内执行，如果当前启动了事务，就挂起当前事务。
+- never，不在事务范围内执行，如果启动了事务就抛异常。
+
+隔离级别：
+
+- default，不设定任何特定的隔离级别，一般会设定为数据库的默认隔离级别。
+- read uncommitted
+- read committed
+- repeatable read
+- serializable
+
+Spring核心的事务基础设施接口：
+
+```
+public interface PlatformTransactionManager {
+	TransactionStatus getTransaction(TransactionDefinition definition) throws TransactionException;
+	void commit(TransactionStatus status) throws TransactionException;
+	void rollback(TransactionStatus status) throws TransactionException;
+}
+```
+
+PlatformTransactionManager抽象了实际的具体事务策略，针对一个给定的TransactionDefinition返回一个TransactionStatus，并且对这个状态对象触发提交或者回滚动作。
+
+这个抽象事务管理器的一个具体事物管理器实例通常情况下是在一个Sprig Bean工厂中被配置为一个bean，并且bean引用可以被传递给需要事务处理的应用对象。
+
+TransactionStatus对象代表当前运行中的事务。
 
 
 
+# Web层设计
+## 基于IOC的中间层骨架
+Spring提供了Web环境中对上下文概念的支持。WebApplicationContext提供了对一般web应用的支持。继承自ApplicationContext接口，增加了对web特有的特性，比如处理对应的ServletContext对象。这个上下文对象能为任何种类的web应用程序提供一个逻辑上的中间层。
 
+作为应用上下文的扩展，WebApplicationContext的实现能在web环境中给普通的JavaBean提供所有Bean工厂服务和应用上下文服务，就像在独立应用环境中使用ClassPathXmlApplicationContext一样。
 
+典型的基于Spring的web应用中，根据web应用上下文由通用的监听器ContextLoaderListener或者启动ContextLoaderContext装载。
 
+作为根的WebApplicationContext实例将被放入ServletContext属性，被各种各样的web资源访问。可以通过预先指定的名称访问ServletContext属性，从而获得web应用上下文。也可以使用WebApplicationContext的getServletContext或者使用WebApplicationContextUtils来获得根应用上下文。
 
+## 请求驱动的Web MVC框架
+请求驱动的Web mvc框架的设计模型通常包括六种类型的对象：
 
+- 控制器controller，由框架调用的组件，负责处理http请求，并确定一个要呈现的视图。
+- 拦截器interceptor，由框架调用的组件，用于拦截控制器的执行，可以获取控制器的内部信息，并且可以终止请求的处理，也可以在控制器前后添加动作。
+- command或form，根据请求参数组装JavaBean。
+- 验证器validator，用于验证command/form对象，如发现错误，则生成验证错误对象，交给视图，验证可以针对整个对象，也可以针对特定的字段。
+- 验证错误收集器validation errors holder，收集验证作物，并将其暴露给视图去显示。
+- 模型model，由控制器暴露给视图的一个或多个JavaBean，表示控制器和视图之间的数据约定。
+- 视图引用view reference，可能是一个符号名称，一个资源url，或一个真实的视图对象。控制器返回视图引用，由框架进行渲染。
 
+## Spring的Web MVC框架
+### 基本的控制器流程
+DispatcherServlet是它的中心点，它把Web请求分发到处理器（handler），并将后者作为普通的Object实例进行处理。
+
+请求与处理器之间的映射关系是由HandlerMapping接口的实现来处理的。这个对象在Servlet上下文中定义为Bean组件。HandlerMapping所返回的处理器将被相应的处理器适配器调用，适配器知道如何使用特定类型的处理器。
+
+处理器默认的接口Controller，只有一个handleRequest方法。
+
+可以看作是控制器的核心接口。handleRequest方法对应于Servlet的service()方法。
+
+HandlerInterceptor接口提供Web专用的拦截器，允许在处理请求之前和之后插入别的操作。
+
+### 模型和视图处理
+Controller可以返回一个ModelAndView对象：
+
+- 视图的符号名称，将被视图解析器或是View接口的实例解析。
+- 一个Map对象，用于放置模型属性，并将这些属性暴露给视图。
+
+Spring的DispatcherServlet将解析视图名称，并将控制器提供的模型和视图一起呈现。真正的解析动作被委托给接口ViewResolver的实现类，只要传入视图名称和当前地区信息即可获得本地化的视图。
+
+ViewResolver默认的实现是InternalResourceViewResolver，这个类将提供的视图名解析为内部资源URL。
+
+Spring直接提供的View接口实现：
+
+- InternalResourceView，用于JSP，Servlet以及其他可通过RequestDispatcher来转向的资源，将模型作为Servlet请求属性暴露给视图。
+- JstlView，扩展了InternalResourceView，用来实现基于JSP页面的JSTL，暴露了JSTL专用的本地化和资源绑定属性。
+- TilesView/TilesJstlView，从InternalResourceView扩展而来，实现Tiles模板定义。
+- VelocityView，实现Velocity模板
+
+### 配置实例
+每个DispatcherServlet都有它自己的命名空间和应用上下文。
+
+WebApplicationObjectSupport提供了访问当前WebApplicationContext的功能；WebContentGenerator封装了各种与HTTP缓存相关的设置。
+
+AbstractController是一个实现了Controller接口的便利基类，应用了WebContentGenerator的缓存功能。
 
 
 
