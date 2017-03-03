@@ -1,5 +1,14 @@
 Spring IOC容器初始化过程分为Resource定位，载入解析，注册。IOC容器初始化过程中不包含Bean的依赖注入。Bean的依赖注入一般会发生在第一次通过getBean向容器索取Bean的时候。
 
+大致步骤：
+
+- 读取xml文件。
+- 将xml文件读取后，变成Resource。
+- 从Resource中解析出BeanDefinition。
+- 将BeanDefinition注册到BeanFactory中。
+
+完成了初始化过程之后，Bean就存在与BeanFactory中，等待被使用。
+
 # ClassPathXmlApplicationContext初始化过程
 实际的构造方法：
 
@@ -10,7 +19,7 @@ public ClassPathXmlApplicationContext(String[] configLocations, boolean refresh,
 	//该方法最终会调用到AbstractApplicationContext的无参构造方法
 	//这里会默认设置解析路径的模式为Ant-style
 	super(parent);
-	//设置Bean定义资源文件的路径
+	//设置Bean定义资源文件的路径，将位置信息保存到configLocations中，供后面解析使用。
 	setConfigLocations(configLocations);
 	if (refresh) {
 		//调用容器的refresh，载入BeanDefinition的入口
@@ -33,6 +42,7 @@ public void refresh() throws BeansException, IllegalStateException {
 		//ClassPathXmlApplicationContext包含着BeanFactory所提供的一切特征
 		//这一步会复用BeanFactory中的配置文件读取解析以及其他功能
 		//这一步之后ClassPathXmlApplicationContext已经包含了BeanFactory所提供的功能，可以进行Bean的提取等基础操作了。
+		//这一步是IOC初始化的整个过程。
 		ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
 
 		//准备当前上下文用的BeanFactory，为BeanFactory配置容器特性，例如类加载器，事件处理器等各种功能填充。
@@ -106,6 +116,7 @@ protected ConfigurableListableBeanFactory obtainFreshBeanFactory() {
 refreshBeanFactory方法在AbstractRefreshableApplicationContext实现：
 
 ```
+//创建载入BeanFactory
 protected final void refreshBeanFactory() throws BeansException {
 	//如果已经存在BeanFactory，销毁并关闭
 	if (hasBeanFactory()) {
@@ -122,9 +133,6 @@ protected final void refreshBeanFactory() throws BeansException {
 		synchronized (this.beanFactoryMonitor) {
 			this.beanFactory = beanFactory;
 		}
-	}
-	catch (IOException ex) {
-		throw new ApplicationContextException("I/O error parsing bean definition source for " + getDisplayName(), ex);
 	}
 }
 ```
@@ -244,7 +252,7 @@ public int registerBeanDefinitions(Document doc, Resource resource) throws BeanD
     //先实例化一个BeanDefinitionDocumentReader，这个对象是通过BeanUtils.instantiateClass方法实例化出来的
     //实际上BeanUtils.instantiateClass中是封装了Java的反射的一些方法，通过基本的Java反射来构造实例。
     BeanDefinitionDocumentReader documentReader = createBeanDefinitionDocumentReader();
-     
+
     //记录下注册之前BeanDefinition中对象的个数。
     int countBefore = getRegistry().getBeanDefinitionCount();
     //开始解析Document
@@ -402,6 +410,97 @@ protected void importBeanDefinitionResource(Element ele) {
 }
 ```
 
+### bean标签的解析
+processBeanDefinition(ele, delegate);这里解析和注册bean。
+
+```
+protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {
+	//解析，将XML的元素解析成BeanDefinition，然后保存在BeanDefinitionHolder中
+	BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
+	if (bdHolder != null) {
+		bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
+		try {
+			//注册
+			BeanDefinitionReaderUtils.registerBeanDefinition(bdHolder, getReaderContext().getRegistry());
+		}
+		//发送注册事件
+		getReaderContext().fireComponentRegistered(new BeanComponentDefinition(bdHolder));
+	}
+}
+```
+
+parseBeanDefinitionElement方法对xml元素进行解析：
+
+```
+//走了好几步，才找到解析的方法
+public AbstractBeanDefinition parseBeanDefinitionElement(
+			Element ele, String beanName, BeanDefinition containingBean) {
+
+	this.parseState.push(new BeanEntry(beanName));
+
+	String className = null;
+	if (ele.hasAttribute(CLASS_ATTRIBUTE)) {
+		className = ele.getAttribute(CLASS_ATTRIBUTE).trim();
+	}
+
+	try {
+		String parent = null;
+		if (ele.hasAttribute(PARENT_ATTRIBUTE)) {
+			parent = ele.getAttribute(PARENT_ATTRIBUTE);
+		}
+		//创建BeanDefinition
+		AbstractBeanDefinition bd = createBeanDefinition(className, parent);
+
+		parseBeanDefinitionAttributes(ele, beanName, containingBean, bd);
+		bd.setDescription(DomUtils.getChildElementValueByTagName(ele, DESCRIPTION_ELEMENT));
+
+		parseMetaElements(ele, bd);
+		parseLookupOverrideSubElements(ele, bd.getMethodOverrides());
+		parseReplacedMethodSubElements(ele, bd.getMethodOverrides());
+		//处理构造器属性
+		parseConstructorArgElements(ele, bd);
+		//处理属性元素
+		parsePropertyElements(ele, bd);
+		parseQualifierElements(ele, bd);
+
+		bd.setResource(this.readerContext.getResource());
+		bd.setSource(extractSource(ele));
+
+		return bd;
+	}
+	finally {
+		this.parseState.pop();
+	}
+
+	return null;
+}
+```
+
+处理完元素之后，组装成了BeanDefinition，然后就开始要注册了，registerBeanDefinition：
+
+```
+public static void registerBeanDefinition(
+		BeanDefinitionHolder definitionHolder, BeanDefinitionRegistry registry)
+		throws BeanDefinitionStoreException {
+
+	//使用唯一的id作为名字注册
+	String beanName = definitionHolder.getBeanName();
+	registry.registerBeanDefinition(beanName, definitionHolder.getBeanDefinition());
+
+	//使用别名注册
+	String[] aliases = definitionHolder.getAliases();
+	if (aliases != null) {
+		for (String aliase : aliases) {
+			registry.registerAlias(beanName, aliase);
+		}
+	}
+}
+```
+
+registry.registerBeanDefinition方法中最主要的就是`this.beanDefinitionMap.put(beanName, beanDefinition)`，将beanName作为key，BeanDefinition作为value放到一个ConcurrentHashMap中去。
+
+到此IOC容器初始化就完成了，接下来就是依赖注入。
+
 ## 总结
 
 - IOC容器初始化入口是在构造方法中调用refresh开始的。
@@ -412,4 +511,3 @@ protected void importBeanDefinitionResource(Element ele) {
 - XmlBeanDefinitionReader是BeanDefinitionReader的实现了，通过它来解析xml配置中的bean定义。
 - 实际的处理过程是委托给BeanDefinitionParserDelegate来完成的。得到Bean的定义信息，这些信息在Spring中使用BeanDefinition对象来表示。
 - BeanDefinition的注册是由BeanDefinitionRegistry实现的registerBeanDefiition方法进行的。内部使用ConcurrentHashMap来保存BeanDefiition。
-
