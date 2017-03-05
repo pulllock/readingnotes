@@ -1,5 +1,5 @@
 
-dubbo的SPI机制类似与Java的SPI，Java的SPI会一次性的实例化所有扩展点的实现，有点显得浪费资源。dubbo的SPI扩展机制增加了对扩展点IOC和AOP的支持。
+dubbo的SPI机制类似与Java的SPI，Java的SPI会一次性的实例化所有扩展点的实现，有点显得浪费资源。dubbo的扩展机制可以方便的获取某一个想要的扩展实现，dubbo的SPI扩展机制增加了对扩展点IOC和AOP的支持。
 
 ExtensionLoader是dubbo的SPI机制的查找服务实现的工具类，类似与Java的ServiceLoader，可做类比。dubbo约定扩展点配置文件放在classpath下的`META-INF/dubbo`目录下，配置文件名为接口的全限定名，配置文件内容为`配置名=扩展实现类的全限定名`。
 
