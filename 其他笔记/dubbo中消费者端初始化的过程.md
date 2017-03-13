@@ -377,6 +377,7 @@ private <T> Invoker<T> doRefer(Cluster cluster, Registry registry, Class<T> type
             + "," + Constants.ROUTERS_CATEGORY));
     //服务的引用与变更全部由Directory异步完成
     //集群策略会将Directory伪装成一个Invoker返回
+    //合并所有相同的invoker
     return cluster.join(directory);
 }
 ```
@@ -463,16 +464,30 @@ public void create(String path, boolean ephemeral) {
     //循环完得到的path为/dubbo
     //dynamic=false 表示该数据为持久数据，当注册方退出时，数据依然保存在注册中心
     if (ephemeral) {
-    	//创建临时的节点，/dubbo
+    	//创建临时的节点
         createEphemeral(path);
     } else {
-    	//创建持久的节点，/dubbo
+    	//创建持久的节点，/dubbo/dubbo.common.hello.service.HelloService/consumers/
+        //consumer%3A%2F%2F192.168.110.197%2Fdubbo.common.hello.service.HelloService%3Fapplication%3Ddubbo-consumer%26
+        //category%3Dconsumers%26check%3Dfalse%26dubbo%3D2.5.3%26interface%3D
+        //dubbo.common.hello.service.HelloService%26methods%3DsayHello%26pid%3D6370%26side%3D
+        //consumer%26timeout%3D100000%26timestamp%3D1489367959659
         createPersistent(path);
     }
 }
 ```
 
-注册到注册中心之后，是监听注册中心，directory.subscribe()，会先经过AbstractRegistry的处理，然后是FailbackRegistry的处理。
+消费者自己注册到注册中心之后，接着是订阅服务提供者，directory.subscribe()：
+
+```
+public void subscribe(URL url) {
+	//设置消费者url
+    setConsumerUrl(url);
+    //这里的registry是ZookeeperRegistry
+    registry.subscribe(url, this);
+}
+```
+看下registry.subscribe(url, this);，这里registry是ZookeeperRegistry，会先经过AbstractRegistry的处理，然后是FailbackRegistry的处理。
 
 在AbstractRegistry中：
 
@@ -519,6 +534,7 @@ protected void doSubscribe(final URL url, final NotifyListener listener) {
                     zkListeners.putIfAbsent(url, new ConcurrentHashMap<NotifyListener, ChildListener>());
                     listeners = zkListeners.get(url);
                 }
+                //将zkClient的事件IZkChildListener转换到registry事件NotifyListener
                 ChildListener zkListener = listeners.get(listener);
                 if (zkListener == null) {
                     listeners.putIfAbsent(listener, new ChildListener() {
@@ -528,7 +544,12 @@ protected void doSubscribe(final URL url, final NotifyListener listener) {
                     });
                     zkListener = listeners.get(listener);
                 }
-                //
+                //创建三个节点
+                // /dubbo/dubbo.common.hello.service.HelloService/providers/
+                // /dubbo/dubbo.common.hello.service.HelloService/configurators/
+                // /dubbo/dubbo.common.hello.service.HelloService/routers/
+                //上面三个路径会被消费者端监听，当提供者，配置，路由发生变化之后，
+                //注册中心会通知消费者刷新本地缓存。
                 zkClient.create(path, false);
                 List<String> children = zkClient.addChildListener(path, zkListener);
                 if (children != null) {
@@ -543,27 +564,264 @@ protected void doSubscribe(final URL url, final NotifyListener listener) {
 }
 ```
 
+服务订阅完成之后，接着就是notify(url, listener, urls);：
+
+会先经过FailbackRegistry将失败的通知请求记录到失败列表，定时重试。
+
 ```
-public void subscribe(URL url) {
-	//设置消费者url
-    setConsumerUrl(url);
-    //这里的registry是ZookeeperRegistry
-    registry.subscribe(url, this);
+protected void notify(URL url, NotifyListener listener, List<URL> urls) {
+    try {
+        doNotify(url, listener, urls);
+    } catch (Exception t) {
+        // 将失败的通知请求记录到失败列表，定时重试
+        Map<NotifyListener, List<URL>> listeners = failedNotified.get(url);
+        if (listeners == null) {
+            failedNotified.putIfAbsent(url, new ConcurrentHashMap<NotifyListener, List<URL>>());
+            listeners = failedNotified.get(url);
+        }
+        listeners.put(listener, urls);
+        logger.error("Failed to notify for subscribe " + url + ", waiting for retry, cause: " + t.getMessage(), t);
+    }
 }
 ```
 
-服务的引用DubboProtocol.refer(type,url)：
+doNotify(url, listener, urls);：
+
+```
+protected void doNotify(URL url, NotifyListener listener, List<URL> urls) {
+	//父类实现
+    super.notify(url, listener, urls);
+}
+```
+
+AbstractRegistry中的doNotify实现：
+
+```
+protected void notify(URL url, NotifyListener listener, List<URL> urls) {
+    Map<String, List<URL>> result = new HashMap<String, List<URL>>();
+    for (URL u : urls) {
+        if (UrlUtils.isMatch(url, u)) {
+        	//不同类型的数据分开通知，providers，consumers，routers，overrides
+            //允许只通知其中一种类型，但该类型的数据必须是全量的，不是增量的。
+            String category = u.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);
+            List<URL> categoryList = result.get(category);
+            if (categoryList == null) {
+                categoryList = new ArrayList<URL>();
+                result.put(category, categoryList);
+            }
+            categoryList.add(u);
+        }
+    }
+    if (result.size() == 0) {
+        return;
+    }
+    Map<String, List<URL>> categoryNotified = notified.get(url);
+    if (categoryNotified == null) {
+        notified.putIfAbsent(url, new ConcurrentHashMap<String, List<URL>>());
+        categoryNotified = notified.get(url);
+    }
+    //对这里得到的providers，configurators，routers分别进行通知
+    for (Map.Entry<String, List<URL>> entry : result.entrySet()) {
+        String category = entry.getKey();
+        List<URL> categoryList = entry.getValue();
+        categoryNotified.put(category, categoryList);
+        saveProperties(url);
+        //这里的listener是RegistryDirectory
+        listener.notify(categoryList);
+    }
+}
+```
+
+到RegistryDirectory中查看notify方法：
+
+```
+public synchronized void notify(List<URL> urls) {
+    List<URL> invokerUrls = new ArrayList<URL>();
+    List<URL> routerUrls = new ArrayList<URL>();
+    List<URL> configuratorUrls = new ArrayList<URL>();
+    for (URL url : urls) {
+        String protocol = url.getProtocol();
+        String category = url.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);
+        if (Constants.ROUTERS_CATEGORY.equals(category) 
+                || Constants.ROUTE_PROTOCOL.equals(protocol)) {
+            routerUrls.add(url);
+        } else if (Constants.CONFIGURATORS_CATEGORY.equals(category) 
+                || Constants.OVERRIDE_PROTOCOL.equals(protocol)) {
+            configuratorUrls.add(url);
+        } else if (Constants.PROVIDERS_CATEGORY.equals(category)) {
+            invokerUrls.add(url);
+        } else {
+            logger.warn("Unsupported category " + category + " in notified url: " + url + " from registry " + getUrl().getAddress() + " to consumer " + NetUtils.getLocalHost());
+        }
+    }
+    // configurators 更新缓存的服务提供方配置
+    if (configuratorUrls != null && configuratorUrls.size() >0 ){
+        this.configurators = toConfigurators(configuratorUrls);
+    }
+    // routers//更新缓存的路由规则配置
+    if (routerUrls != null && routerUrls.size() >0 ){
+        List<Router> routers = toRouters(routerUrls);
+        if(routers != null){ // null - do nothing
+            setRouters(routers);
+        }
+    }
+    List<Configurator> localConfigurators = this.configurators; // local reference
+    // 合并override参数
+    this.overrideDirectoryUrl = directoryUrl;
+    if (localConfigurators != null && localConfigurators.size() > 0) {
+        for (Configurator configurator : localConfigurators) {
+            this.overrideDirectoryUrl = configurator.configure(overrideDirectoryUrl);
+        }
+    }
+    // providers
+    //重建invoker实例
+    refreshInvoker(invokerUrls);
+}
+```
+
+refreshInvoker(invokerUrls);：
+
+```
+/**
+ * 根据invokerURL列表转换为invoker列表。转换规则如下：
+ * 1.如果url已经被转换为invoker，则不在重新引用，直接从缓存中获取，注意如果url中任何一个参数变更也会重新引用
+ * 2.如果传入的invoker列表不为空，则表示最新的invoker列表
+ * 3.如果传入的invokerUrl列表是空，则表示只是下发的override规则或route规则，需要重新交叉对比，决定是否需要重新引用。
+ * @param invokerUrls 传入的参数不能为null
+ */
+private void refreshInvoker(List<URL> invokerUrls){
+    if (invokerUrls != null && invokerUrls.size() == 1 && invokerUrls.get(0) != null
+            && Constants.EMPTY_PROTOCOL.equals(invokerUrls.get(0).getProtocol())) {
+        this.forbidden = true; // 禁止访问
+        this.methodInvokerMap = null; // 置空列表
+        destroyAllInvokers(); // 关闭所有Invoker
+    } else {
+        this.forbidden = false; // 允许访问
+        Map<String, Invoker<T>> oldUrlInvokerMap = this.urlInvokerMap; // local reference
+        if (invokerUrls.size() == 0 && this.cachedInvokerUrls != null){
+            invokerUrls.addAll(this.cachedInvokerUrls);
+        } else {
+            this.cachedInvokerUrls = new HashSet<URL>();
+            this.cachedInvokerUrls.addAll(invokerUrls);//缓存invokerUrls列表，便于交叉对比
+        }
+        if (invokerUrls.size() ==0 ){
+            return;
+        }
+        //会重新走一遍服务的引用过程
+        //给每个提供者创建一个Invoker
+        Map<String, Invoker<T>> newUrlInvokerMap = toInvokers(invokerUrls) ;// 将URL列表转成Invoker列表
+        Map<String, List<Invoker<T>>> newMethodInvokerMap = toMethodInvokers(newUrlInvokerMap); // 换方法名映射Invoker列表
+        // state change
+        //如果计算错误，则不进行处理.
+        if (newUrlInvokerMap == null || newUrlInvokerMap.size() == 0 ){
+            logger.error(new IllegalStateException("urls to invokers error .invokerUrls.size :"+invokerUrls.size() + ", invoker.size :0. urls :"+invokerUrls.toString()));
+            return ;
+        }
+        //服务提供者Invoker保存在这个map中
+        this.methodInvokerMap = multiGroup ? toMergeMethodInvokerMap(newMethodInvokerMap) : newMethodInvokerMap;
+        this.urlInvokerMap = newUrlInvokerMap;
+        try{
+            destroyUnusedInvokers(oldUrlInvokerMap,newUrlInvokerMap); // 关闭未使用的Invoker
+        }catch (Exception e) {
+            logger.warn("destroyUnusedInvokers error. ", e);
+        }
+    }
+}
+```
+
+toInvokers(invokerUrls) 方法：
+
+```
+private Map<String, Invoker<T>> toInvokers(List<URL> urls) {
+    Map<String, Invoker<T>> newUrlInvokerMap = new HashMap<String, Invoker<T>>();
+    if(urls == null || urls.size() == 0){
+        return newUrlInvokerMap;
+    }
+    Set<String> keys = new HashSet<String>();
+    String queryProtocols = this.queryMap.get(Constants.PROTOCOL_KEY);
+    for (URL providerUrl : urls) {
+    	//此时url是dubbo://192.168.110.197:20880/dubbo.common.hello.service.HelloService?anyhost=true&
+        //application=dubbo-provider&application.version=1.0&dubbo=2.5.3&environment=product&
+        //interface=dubbo.common.hello.service.HelloService&methods=sayHello&organization=china&
+        //owner=cheng.xi&pid=5631&side=provider&timestamp=1489367571986
+        //从注册中心获取到的携带提供者信息的url
+        //如果reference端配置了protocol，则只选择匹配的protocol
+        if (queryProtocols != null && queryProtocols.length() >0) {
+            boolean accept = false;
+            String[] acceptProtocols = queryProtocols.split(",");
+            for (String acceptProtocol : acceptProtocols) {
+                if (providerUrl.getProtocol().equals(acceptProtocol)) {
+                    accept = true;
+                    break;
+                }
+            }
+            if (!accept) {
+                continue;
+            }
+        }
+        if (Constants.EMPTY_PROTOCOL.equals(providerUrl.getProtocol())) {
+            continue;
+        }
+        if (! ExtensionLoader.getExtensionLoader(Protocol.class).hasExtension(providerUrl.getProtocol())) {
+            logger.error(new IllegalStateException("Unsupported protocol " + providerUrl.getProtocol() + " in notified url: " + providerUrl + " from registry " + getUrl().getAddress() + " to consumer " + NetUtils.getLocalHost() 
+                    + ", supported protocol: "+ExtensionLoader.getExtensionLoader(Protocol.class).getSupportedExtensions()));
+            continue;
+        }
+        URL url = mergeUrl(providerUrl);
+
+        String key = url.toFullString(); // URL参数是排序的
+        if (keys.contains(key)) { // 重复URL
+            continue;
+        }
+        keys.add(key);
+        // 缓存key为没有合并消费端参数的URL，不管消费端如何合并参数，如果服务端URL发生变化，则重新refer
+        Map<String, Invoker<T>> localUrlInvokerMap = this.urlInvokerMap; // local reference
+        Invoker<T> invoker = localUrlInvokerMap == null ? null : localUrlInvokerMap.get(key);
+        if (invoker == null) { // 缓存中没有，重新refer
+            try {
+                boolean enabled = true;
+                if (url.hasParameter(Constants.DISABLED_KEY)) {
+                    enabled = ! url.getParameter(Constants.DISABLED_KEY, false);
+                } else {
+                    enabled = url.getParameter(Constants.ENABLED_KEY, true);
+                }
+                if (enabled) {
+                	//根据扩展点加载机制，这里使用的protocol是DubboProtocol
+                    invoker = new InvokerDelegete<T>(protocol.refer(serviceType, url), url, providerUrl);
+                }
+            } catch (Throwable t) {
+                logger.error("Failed to refer invoker for interface:"+serviceType+",url:("+url+")" + t.getMessage(), t);
+            }
+            if (invoker != null) { // 将新的引用放入缓存
+                newUrlInvokerMap.put(key, invoker);
+            }
+        }else {
+            newUrlInvokerMap.put(key, invoker);
+        }
+    }
+    keys.clear();
+    return newUrlInvokerMap;
+}
+```
+
+创建invoker `invoker = new InvokerDelegete<T>(protocol.refer(serviceType, url), url, providerUrl);`：
+
+- 先使用DubboProtocol的refer方法，这一步会依次调用ProtocolFIlterListenerWrapper，ProtocolFilterWrapper，DubboProtocol中的refer方法。经过两个Wrapper中，会添加对应的InvokerListener并构建Invoker Filter链，在DubboProtocol中会创建一个DubboInvoker对象，该Invoker对象持有服务Class，providerUrl，负责和服务提供端通信的ExchangeClient。
+- 接着使用得到的Invoker创建一个InvokerDelegete
+
+在DubboProtocol中创建DubboInvoker的时候代码如下：
 
 ```
 public <T> Invoker<T> refer(Class<T> serviceType, URL url) throws RpcException {
-    //创建一个消费者端的Invoker
-    //getClients是NIO框架Client的创建
+    // create rpc invoker.
+    //这里有一个getClients方法
     DubboInvoker<T> invoker = new DubboInvoker<T>(serviceType, url, getClients(url), invokers);
     invokers.add(invoker);
     return invoker;
 }
 ```
-getClients负责NIO框架Client创建以及初始化：
+
+查看getClients方法：
 
 ```
 private ExchangeClient[] getClients(URL url){
@@ -579,17 +837,294 @@ private ExchangeClient[] getClients(URL url){
     ExchangeClient[] clients = new ExchangeClient[connections];
     for (int i = 0; i < clients.length; i++) {
         if (service_share_connect){
-        	//共享型的client
+        	//这里没有配置connections，就使用getSharedClient
+            //getSharedClient中先去缓存中查找，没有的话就会新建，也是调用initClient方法
             clients[i] = getSharedClient(url);
         } else {
-        	//不共享的client
             clients[i] = initClient(url);
         }
     }
     return clients;
 }
 ```
-共享型的client，消费者引用同一提供者的服务时，使用同一个Client来提高通信效率。
 
-非共享型的client，initClient。封装了服务引用中remote层初始化的所有逻辑，与服务提供者端类似，就是Client，Handler，Channel的创建和装饰的过程。
+直接看initClient方法：
+
+```
+//创建新连接
+private ExchangeClient initClient(URL url) {
+        
+    // client type setting.
+    String str = url.getParameter(Constants.CLIENT_KEY, url.getParameter(Constants.SERVER_KEY, Constants.DEFAULT_REMOTING_CLIENT));
+
+    String version = url.getParameter(Constants.DUBBO_VERSION_KEY);
+    boolean compatible = (version != null && version.startsWith("1.0."));
+    url = url.addParameter(Constants.CODEC_KEY, Version.isCompatibleVersion() && compatible ? COMPATIBLE_CODEC_NAME : DubboCodec.NAME);
+    //默认开启heartbeat
+    url = url.addParameterIfAbsent(Constants.HEARTBEAT_KEY, String.valueOf(Constants.DEFAULT_HEARTBEAT));
+
+    // BIO存在严重性能问题，暂时不允许使用
+    if (str != null && str.length() > 0 && ! ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(str)) {
+        throw new RpcException("Unsupported client type: " + str + "," +
+                " supported client type is " + StringUtils.join(ExtensionLoader.getExtensionLoader(Transporter.class).getSupportedExtensions(), " "));
+    }
+
+    ExchangeClient client ;
+    try {
+    	//如果lazy属性没有配置为true（我们没有配置，默认为false）ExchangeClient会马上和服务端建立连接
+        //设置连接应该是lazy的 
+        if (url.getParameter(Constants.LAZY_CONNECT_KEY, false)){
+            client = new LazyConnectExchangeClient(url ,requestHandler);
+        } else {
+        	//立即和服务端建立连接
+            client = Exchangers.connect(url ,requestHandler);
+        }
+    } catch (RemotingException e) {
+        throw new RpcException("Fail to create remoting client for service(" + url
+                + "): " + e.getMessage(), e);
+    }
+    return client;
+}
+```
+
+和服务端建立连接，Exchangers.connect(url ,requestHandler);，其实最后使用的是HeaderExchanger，Exchanger目前只有这一个实现：
+
+```
+public ExchangeClient connect(URL url, ExchangeHandler handler) throws RemotingException {
+	//先经过HeaderExchangeHandler包装
+    //然后是DecodeHandler
+    //然后是Transporters.connect
+    //返回一个HeaderExchangerClient，这里封装了client，channel，启动心跳的定时器等
+    return new HeaderExchangeClient(Transporters.connect(url, new DecodeHandler(new HeaderExchangeHandler(handler))));
+}
+```
+
+Transporters.connect中也是根据SPI扩展获取Transport的具体实现，这里默认使用NettyTransporter.connect()，在NettyTransporter的connect方法中直接返回一个NettyClient(url, listener);，下面看下具体的NettyClient初始化细节，会先初始化AbstractPeer这里只是吧url和handler赋值；然后是AbstractEndpoint初始化：
+
+```
+public AbstractEndpoint(URL url, ChannelHandler handler) {
+    super(url, handler);
+    //这里是DubboCodec
+    this.codec = getChannelCodec(url);
+    this.timeout = url.getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
+    this.connectTimeout = url.getPositiveParameter(Constants.CONNECT_TIMEOUT_KEY, Constants.DEFAULT_CONNECT_TIMEOUT);
+}
+```
+
+接着是AbstractClient的初始化：
+
+```
+public AbstractClient(URL url, ChannelHandler handler) throws RemotingException {
+    super(url, handler);
+    send_reconnect = url.getParameter(Constants.SEND_RECONNECT_KEY, false);
+    shutdown_timeout = url.getParameter(Constants.SHUTDOWN_TIMEOUT_KEY, Constants.DEFAULT_SHUTDOWN_TIMEOUT);
+    //默认重连间隔2s，1800表示1小时warning一次.
+    reconnect_warning_period = url.getParameter("reconnect.waring.period", 1800);
+
+    try {
+    	//具体实现在子类中
+        doOpen();
+    } catch (Throwable t) {。。。 }
+    try {
+        // 连接
+        connect();
+    } catch (RemotingException t) {。。。} 
+	// TODO暂没理解
+    executor = (ExecutorService) ExtensionLoader.getExtensionLoader(DataStore.class)
+        .getDefaultExtension().get(Constants.CONSUMER_SIDE, Integer.toString(url.getPort()));
+    ExtensionLoader.getExtensionLoader(DataStore.class)
+        .getDefaultExtension().remove(Constants.CONSUMER_SIDE, Integer.toString(url.getPort()));
+}
+```
+
+看下在NettyClient中doOpen()的实现：
+
+```
+protected void doOpen() throws Throwable {
+    NettyHelper.setNettyLoggerFactory();
+    bootstrap = new ClientBootstrap(channelFactory);
+    // config
+    // @see org.jboss.netty.channel.socket.SocketChannelConfig
+    bootstrap.setOption("keepAlive", true);
+    bootstrap.setOption("tcpNoDelay", true);
+    bootstrap.setOption("connectTimeoutMillis", getTimeout());
+    final NettyHandler nettyHandler = new NettyHandler(getUrl(), this);
+    bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
+        public ChannelPipeline getPipeline() {
+            NettyCodecAdapter adapter = new NettyCodecAdapter(getCodec(), getUrl(), NettyClient.this);
+            ChannelPipeline pipeline = Channels.pipeline();
+            pipeline.addLast("decoder", adapter.getDecoder());
+            pipeline.addLast("encoder", adapter.getEncoder());
+            pipeline.addLast("handler", nettyHandler);
+            return pipeline;
+        }
+    });
+}
+```
+这里是Netty3中的客户端连接的一些常规步骤，暂不做具体解析。open之后，就是真正连接服务端的操作了，connect()：
+
+```
+protected void connect() throws RemotingException {
+    connectLock.lock();
+    try {
+        if (isConnected()) {
+            return;
+        }
+        //初始化重连的线程
+        initConnectStatusCheckCommand();
+        //连接，在子类中实现
+        doConnect();
+        reconnect_count.set(0);
+        reconnect_error_log_flag.set(false);
+    } catch (RemotingException e) {。。。} finally {
+        connectLock.unlock();
+    }
+}
+```
+
+NettyClient中的doConnect方法：
+
+```
+protected void doConnect() throws Throwable {
+    long start = System.currentTimeMillis();
+    //消费者端开始连接，这一步的时候，服务提供者端就接到了连接请求，开始处理了
+    ChannelFuture future = bootstrap.connect(getConnectAddress());
+    try{
+        boolean ret = future.awaitUninterruptibly(getConnectTimeout(), TimeUnit.MILLISECONDS);
+        if (ret && future.isSuccess()) {
+            Channel newChannel = future.getChannel();
+            newChannel.setInterestOps(Channel.OP_READ_WRITE);
+            try {
+                // 关闭旧的连接
+                Channel oldChannel = NettyClient.this.channel; // copy reference
+                if (oldChannel != null) {
+                    try {
+                        oldChannel.close();
+                    } finally {
+                        NettyChannel.removeChannelIfDisconnected(oldChannel);
+                    }
+                }
+            } finally {
+                if (NettyClient.this.isClosed()) {
+                    try {
+                        newChannel.close();
+                    } finally {
+                        NettyClient.this.channel = null;
+                        NettyChannel.removeChannelIfDisconnected(newChannel);
+                    }
+                } else {
+                    NettyClient.this.channel = newChannel;
+                }
+            }
+        } else if (future.getCause() != null) { throw。。。  } else {throw 。。。 }
+    }finally{
+        if (! isConnected()) {
+            future.cancel();
+        }
+    }
+}
+```
+这里连接的细节都交给了netty。
+
+NettyClient初始化完成之后，返回给Transporters，再返回给HeaderExchanger，HeaderExchanger中将NettyClient包装成HeaderExchangeClient返回给DubboProtocol的initClient方法中，到此在getSharedClient中就获取到了一个ExchangeClient。
+
+到这里在DubboProtocol的refer方法中这句`DubboInvoker<T> invoker = new DubboInvoker<T>(serviceType, url, getClients(url), invokers);`创建DubboInvoker就已经解析完成，创建过程中连接了服务端，包含一个ExchangeClient等：
+
+```
+public <T> Invoker<T> refer(Class<T> serviceType, URL url) throws RpcException {
+    // create rpc invoker.
+    DubboInvoker<T> invoker = new DubboInvoker<T>(serviceType, url, getClients(url), invokers);
+    //将invoker缓存
+    invokers.add(invoker);
+    //返回invoker
+    return invoker;
+}
+```
+
+接着在返回到toInvokers方法，然后返回refreshInvoker方法的`Map<String, Invoker<T>> newUrlInvokerMap = toInvokers(invokerUrls) ;`这就获得了Invoker，接着就是方法名映射Invoker列表：`Map<String, List<Invoker<T>>> newMethodInvokerMap = toMethodInvokers(newUrlInvokerMap); `这里将invokers列表转成与方法的映射关系。到这里refreshInvoker方法就完成了，在往上就返回到AbstractRegistry的notify方法，到这里也完成了。
+
+到这里有关消费者端注册到注册中心和订阅注册中心就完事儿了，这部分是在RegistryProtocol .doRefer方法中，这个方法最后一句是`return cluster.join(directory);`，这里由Cluster组件创建一个Invoker并返回，这里的cluster默认是用
+
+
+创建完Invoker之后，接着进行下一步：`toMethodInvokers(newUrlInvokerMap);`
+
+注册到注册中心和订阅都完事了之后，看最后一步return cluster.join(directory);这里默认是FailoverCluster，最后返回的是经过MockClusterInvoker包装过的FailoverCluster。继续返回到ReferenceConfig中createProxy方法，这时候我们已经完成了消费者端引用服务的Invoker。然后最后返回的是根据我们得到的invoker创建的服务代理`return (T) proxyFactory.getProxy(invoker);`。这里proxyFactory是我们在最上面列出的动态生成的代码。
+
+首先经过AbstractProxyFactory的处理：
+
+```
+public <T> T getProxy(Invoker<T> invoker) throws RpcException {
+    Class<?>[] interfaces = null;
+    String config = invoker.getUrl().getParameter("interfaces");
+    if (config != null && config.length() > 0) {
+        String[] types = Constants.COMMA_SPLIT_PATTERN.split(config);
+        if (types != null && types.length > 0) {
+            interfaces = new Class<?>[types.length + 2];
+            interfaces[0] = invoker.getInterface();
+            interfaces[1] = EchoService.class;
+            for (int i = 0; i < types.length; i ++) {
+                interfaces[i + 1] = ReflectUtils.forName(types[i]);
+            }
+        }
+    }
+    if (interfaces == null) {
+        interfaces = new Class<?>[] {invoker.getInterface(), EchoService.class};
+    }
+    //这里默认使用的是JavassistProxyFactory的实现
+    return getProxy(invoker, interfaces);
+}
+```
+
+然后经过StubProxyFactoryWrapper的处理：
+
+```
+public <T> T getProxy(Invoker<T> invoker) throws RpcException {
+    T proxy = proxyFactory.getProxy(invoker);
+    if (GenericService.class != invoker.getInterface()) {
+        String stub = invoker.getUrl().getParameter(Constants.STUB_KEY, invoker.getUrl().getParameter(Constants.LOCAL_KEY));
+        if (ConfigUtils.isNotEmpty(stub)) {
+            Class<?> serviceType = invoker.getInterface();
+            if (ConfigUtils.isDefault(stub)) {
+                if (invoker.getUrl().hasParameter(Constants.STUB_KEY)) {
+                    stub = serviceType.getName() + "Stub";
+                } else {
+                    stub = serviceType.getName() + "Local";
+                }
+            }
+            try {
+                Class<?> stubClass = ReflectUtils.forName(stub);
+                if (! serviceType.isAssignableFrom(stubClass)) {
+                    throw new IllegalStateException("The stub implemention class " + stubClass.getName() + " not implement interface " + serviceType.getName());
+                }
+                try {
+                    Constructor<?> constructor = ReflectUtils.findConstructor(stubClass, serviceType);
+                    proxy = (T) constructor.newInstance(new Object[] {proxy});
+                    //export stub service
+                    URL url = invoker.getUrl();
+                    if (url.getParameter(Constants.STUB_EVENT_KEY, Constants.DEFAULT_STUB_EVENT)){
+                        url = url.addParameter(Constants.STUB_EVENT_METHODS_KEY, StringUtils.join(Wrapper.getWrapper(proxy.getClass()).getDeclaredMethodNames(), ","));
+                        url = url.addParameter(Constants.IS_SERVER_KEY, Boolean.FALSE.toString());
+                        try{
+                            export(proxy, (Class)invoker.getInterface(), url);
+                        }catch (Exception e) {
+                            LOGGER.error("export a stub service error.", e);
+                        }
+                    }
+                } catch (NoSuchMethodException e) {
+                    throw new IllegalStateException("No such constructor \"public " + stubClass.getSimpleName() + "(" + serviceType.getName() + ")\" in stub implemention class " + stubClass.getName(), e);
+                }
+            } catch (Throwable t) {
+                LOGGER.error("Failed to create stub implemention class " + stub + " in consumer " + NetUtils.getLocalHost() + " use dubbo version " + Version.getVersion() + ", cause: " + t.getMessage(), t);
+                // ignore
+            }
+        }
+    }
+    return proxy;
+}
+```
+返回代理。到此`HelloService helloService = (HelloService) applicationContext.getBean("helloService");`就解析完成了，得到了服务的代理，代理会被注册到Spring容器中，可以调用服务方法了。接下来的方法调用过程，是消费者发送请求，提供者处理，然后消费者接受处理结果的请求。
+
+初始化的过程：主要做了注册到注册中心，监听注册中心，连接到服务提供者端，创建代理。这些都是为了下面消费者和提供者之间的通信做准备。
+
+
 
