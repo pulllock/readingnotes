@@ -1043,12 +1043,7 @@ public <T> Invoker<T> refer(Class<T> serviceType, URL url) throws RpcException {
 
 接着在返回到toInvokers方法，然后返回refreshInvoker方法的`Map<String, Invoker<T>> newUrlInvokerMap = toInvokers(invokerUrls) ;`这就获得了Invoker，接着就是方法名映射Invoker列表：`Map<String, List<Invoker<T>>> newMethodInvokerMap = toMethodInvokers(newUrlInvokerMap); `这里将invokers列表转成与方法的映射关系。到这里refreshInvoker方法就完成了，在往上就返回到AbstractRegistry的notify方法，到这里也完成了。
 
-到这里有关消费者端注册到注册中心和订阅注册中心就完事儿了，这部分是在RegistryProtocol .doRefer方法中，这个方法最后一句是`return cluster.join(directory);`，这里由Cluster组件创建一个Invoker并返回，这里的cluster默认是用
-
-
-创建完Invoker之后，接着进行下一步：`toMethodInvokers(newUrlInvokerMap);`
-
-注册到注册中心和订阅都完事了之后，看最后一步return cluster.join(directory);这里默认是FailoverCluster，最后返回的是经过MockClusterInvoker包装过的FailoverCluster。继续返回到ReferenceConfig中createProxy方法，这时候我们已经完成了消费者端引用服务的Invoker。然后最后返回的是根据我们得到的invoker创建的服务代理`return (T) proxyFactory.getProxy(invoker);`。这里proxyFactory是我们在最上面列出的动态生成的代码。
+到这里有关消费者端注册到注册中心和订阅注册中心就完事儿了，这部分是在RegistryProtocol .doRefer方法中，这个方法最后一句是`return cluster.join(directory);`，这里由Cluster组件创建一个Invoker并返回，这里的cluster默认是用FailoverCluster，最后返回的是经过MockClusterInvoker包装过的FailoverCluster。继续返回到ReferenceConfig中createProxy方法，这时候我们已经完成了消费者端引用服务的Invoker。然后最后返回的是根据我们得到的invoker创建的服务代理`return (T) proxyFactory.getProxy(invoker);`。这里proxyFactory是我们在最上面列出的动态生成的代码。
 
 首先经过AbstractProxyFactory的处理：
 
