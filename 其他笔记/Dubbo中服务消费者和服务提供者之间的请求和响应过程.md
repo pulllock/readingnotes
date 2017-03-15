@@ -1,5 +1,208 @@
 服务提供者初始化完成之后，对外暴露的是Exporter。服务消费者初始化完成之后，对外提供的是Proxy代理。
 
+服务消费者经过初始化之后，得到的是一个动态代理类，InvokerInvocationHandler，包含MockClusterInvoker，MockClusterInvoker包含一个RegistryDirectory和FailoverClusterInvoker。
+
+Java动态代理，每一个动态代理类都必须要实现InvocationHandler这个接口，并且每一个代理类的实例都关联到了一个handler，当我们通过代理对象调用一个方法的时候，这个方法就会被转发为由实现了InvocationHandler这个接口的类的invoke方法来进行调用。
+
+InvokerInvocationHandler实现了InvocationHandler接口，当我们调用`helloService.sayHello();`的时候，实际上会调用invoke()方法：
+
+```
+//proxy是代理的真实对象
+//method调用真实对象的方法
+//args调用真实对象的方法的参数
+public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+	//方法名sayHello
+    String methodName = method.getName();
+    //参数类型
+    Class<?>[] parameterTypes = method.getParameterTypes();
+    if (method.getDeclaringClass() == Object.class) {
+        return method.invoke(invoker, args);
+    }
+    if ("toString".equals(methodName) && parameterTypes.length == 0) {
+        return invoker.toString();
+    }
+    if ("hashCode".equals(methodName) && parameterTypes.length == 0) {
+        return invoker.hashCode();
+    }
+    if ("equals".equals(methodName) && parameterTypes.length == 1) {
+        return invoker.equals(args[0]);
+    }
+    //invoker是MockClusterInvoker
+    //首先new RpcInvocation
+    //然后invoker.invoke
+    //最后recreate
+    //返回结果
+    return invoker.invoke(new RpcInvocation(method, args)).recreate();
+}
+```
+
+先看下`new RpcInvocation`，Invocation是会话域，它持有调用过程中的变量，比如方法名，参数等。
+
+接着是invoker.invoke()，这里invoker是MockClusterInvoker，进入MockClusterInvoker.invoker()：
+
+```
+public Result invoke(Invocation invocation) throws RpcException {
+    Result result = null;
+	//
+    String value = directory.getUrl().getMethodParameter(invocation.getMethodName(), Constants.MOCK_KEY, Boolean.FALSE.toString()).trim(); 
+    if (value.length() == 0 || value.equalsIgnoreCase("false")){
+        //这里invoker是FailoverClusterInvoker
+        result = this.invoker.invoke(invocation);
+    } else if (value.startsWith("force")) {
+        if (logger.isWarnEnabled()) {
+            logger.info("force-mock: " + invocation.getMethodName() + " force-mock enabled , url : " +  directory.getUrl());
+        }
+        //force:direct mock
+        result = doMockInvoke(invocation, null);
+    } else {
+        //fail-mock
+        try {
+            result = this.invoker.invoke(invocation);
+        }catch (RpcException e) {
+            if (e.isBiz()) {
+                throw e;
+            } else {
+                if (logger.isWarnEnabled()) {
+                    logger.info("fail-mock: " + invocation.getMethodName() + " fail-mock enabled , url : " +  directory.getUrl(), e);
+                }
+                result = doMockInvoke(invocation, e);
+            }
+        }
+    }
+    return result;
+}
+```
+
+`result = this.invoker.invoke(invocation);`这里invoker是FailoverClusterInvoker，会首先进入AbstractClusterInvoker的invoke方法：
+
+```
+public Result invoke(final Invocation invocation) throws RpcException {
+	//检查是否被销毁
+    checkWheatherDestoried();
+    LoadBalance loadbalance;
+	//根据invocation中的参数来获取所有的invoker列表
+    List<Invoker<T>> invokers = list(invocation);
+    if (invokers != null && invokers.size() > 0) {
+    	//我们没有配置负载均衡的参数，默认使用random
+        //这里得到的是RandomLoadBalance
+        loadbalance = ExtensionLoader.getExtensionLoader(LoadBalance.class).getExtension(invokers.get(0).getUrl()
+                .getMethodParameter(invocation.getMethodName(),Constants.LOADBALANCE_KEY, Constants.DEFAULT_LOADBALANCE));
+    } else {
+        loadbalance = ExtensionLoader.getExtensionLoader(LoadBalance.class).getExtension(Constants.DEFAULT_LOADBALANCE);
+    }
+    //如果是异步操作默认添加invocation id
+    RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
+    //这里是子类实现，FailoverClusterInvoker中
+    return doInvoke(invocation, invokers, loadbalance);
+}
+```
+
+FailoverClusterInvoker.doInvoke()：
+
+```
+public Result doInvoke(Invocation invocation, final List<Invoker<T>> invokers, LoadBalance loadbalance) throws RpcException {
+    List<Invoker<T>> copyinvokers = invokers;
+    checkInvokers(copyinvokers, invocation);
+    int len = getUrl().getMethodParameter(invocation.getMethodName(), Constants.RETRIES_KEY, Constants.DEFAULT_RETRIES) + 1;
+    if (len <= 0) {
+        len = 1;
+    }
+    // retry loop.
+    RpcException le = null; // last exception.
+    List<Invoker<T>> invoked = new ArrayList<Invoker<T>>(copyinvokers.size()); // invoked invokers.
+    Set<String> providers = new HashSet<String>(len);
+    for (int i = 0; i < len; i++) {
+        //重试时，进行重新选择，避免重试时invoker列表已发生变化.
+        //注意：如果列表发生了变化，那么invoked判断会失效，因为invoker示例已经改变
+        if (i > 0) {
+            checkWheatherDestoried();
+            copyinvokers = list(invocation);
+            //重新检查一下
+            checkInvokers(copyinvokers, invocation);
+        }
+        使用loadbalance选择invoker.
+        Invoker<T> invoker = select(loadbalance, invocation, copyinvokers, invoked);
+        invoked.add(invoker);
+        RpcContext.getContext().setInvokers((List)invoked);
+        try {
+        	//开始调用，返回结果
+            Result result = invoker.invoke(invocation);
+            return result;
+        } catch (RpcException e) {。。。 } finally {
+            providers.add(invoker.getUrl().getAddress());
+        }
+    }
+    throw new RpcException(。。。);
+}
+```
+`Result result = invoker.invoke(invocation);`调用并返回结果，会首先进入InvokerWrapper，然后进入ListenerInvokerWrapper的invoke方法，接着进入AbstractInvoker的invoke：
+
+```
+public Result invoke(Invocation inv) throws RpcException {
+    if(destroyed) {
+        throw new RpcException(。。。);
+    }
+    RpcInvocation invocation = (RpcInvocation) inv;
+    invocation.setInvoker(this);
+    if (attachment != null && attachment.size() > 0) {
+        invocation.addAttachmentsIfAbsent(attachment);
+    }
+    Map<String, String> context = RpcContext.getContext().getAttachments();
+    if (context != null) {
+        invocation.addAttachmentsIfAbsent(context);
+    }
+    if (getUrl().getMethodParameter(invocation.getMethodName(), Constants.ASYNC_KEY, false)){
+        invocation.setAttachment(Constants.ASYNC_KEY, Boolean.TRUE.toString());
+    }
+    RpcUtils.attachInvocationIdIfAsync(getUrl(), invocation);
+    try {
+    	//这里是DubboInvoker
+        return doInvoke(invocation);
+    } catch (InvocationTargetException e) { } 
+}
+```
+
+DubboInvoker.doInvoke()：
+
+```
+protected Result doInvoke(final Invocation invocation) throws Throwable {
+    RpcInvocation inv = (RpcInvocation) invocation;
+    final String methodName = RpcUtils.getMethodName(invocation);
+    inv.setAttachment(Constants.PATH_KEY, getUrl().getPath());
+    inv.setAttachment(Constants.VERSION_KEY, version);
+
+    ExchangeClient currentClient;
+    if (clients.length == 1) {
+        currentClient = clients[0];
+    } else {
+        currentClient = clients[index.getAndIncrement() % clients.length];
+    }
+    try {
+        boolean isAsync = RpcUtils.isAsync(getUrl(), invocation);
+        boolean isOneway = RpcUtils.isOneway(getUrl(), invocation);
+        int timeout = getUrl().getMethodParameter(methodName, Constants.TIMEOUT_KEY,Constants.DEFAULT_TIMEOUT);
+        if (isOneway) {
+            boolean isSent = getUrl().getMethodParameter(methodName, Constants.SENT_KEY, false);
+            currentClient.send(inv, isSent);
+            RpcContext.getContext().setFuture(null);
+            return new RpcResult();
+        } else if (isAsync) {
+            ResponseFuture future = currentClient.request(inv, timeout) ;
+            RpcContext.getContext().setFuture(new FutureAdapter<Object>(future));
+            return new RpcResult();
+        } else {
+            RpcContext.getContext().setFuture(null);
+            //HeaderExchangeClient
+            return (Result) currentClient.request(inv, timeout).get();
+        }
+    } catch (TimeoutException e) {
+        throw new RpcException(RpcException.TIMEOUT_EXCEPTION, "Invoke remote method timeout. method: " + invocation.getMethodName() + ", provider: " + getUrl() + ", cause: " + e.getMessage(), e);
+    } catch (RemotingException e) {
+        throw new RpcException(RpcException.NETWORK_EXCEPTION, "Failed to invoke remote method: " + invocation.getMethodName() + ", provider: " + getUrl() + ", cause: " + e.getMessage(), e);
+    }
+}
+```
+
 服务消费者发起请求：
 
 1. helloService.hello()，消费者需要调用的远程的服务，这里helloService是代理。
