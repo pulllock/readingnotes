@@ -8,6 +8,12 @@ dubbo暴露服务有两种情况，一种是设置了延迟暴露（比如delay=
 # 过程
 以没有设置延迟暴露熟属性的过程为例。
 
+## 简易的暴露流程
+
+1. 首先将服务的实现封装成一个Invoker，Invoker中封装了服务的实现类。
+2. 将Invoker封装成Exporter，并缓存起来，缓存里使用Invoker的url作为key。
+3. 服务端Server启动，监听端口。（请求来到时，根据请求信息生成key，到缓存查找Exporter，就找到了Invoker，就可以完成调用。）
+
 ## Spring容器初始化调用
 当Spring容器实例化bean完成，走到最后一步发布ContextRefreshEvent事件的时候，ServiceBean会执行onApplicationEvent方法，该方法调用ServiceConfig的export方法。
 
@@ -102,6 +108,17 @@ public class ProxyFactory$Adpative implements com.alibaba.dubbo.rpc.ProxyFactory
 生成的代码中可以看到，默认的Protocol实现是dubbo，默认的proxy是javassist。
 
 ## ServiceConfig的export
+
+### export的步骤简介
+
+1. 首先会检查各种配置信息，填充各种属性，总之就是保证我在开始暴露服务之前，所有的东西都准备好了，并且是正确的。
+2. 加载所有的注册中心，因为我们暴露服务需要注册到注册中心中去。
+3. 根据配置的所有协议和注册中心url分别进行导出。
+4. 进行导出的时候，又是一波属性的获取设置检查等操作。
+5. 如果配置的不是remote，则做本地导出。
+6. 如果配置的不是local，则暴露为远程服务。
+7. 不管是本地还是远程服务暴露，首先都会获取Invoker。
+8. 获取完Invoker之后，转换成对外的Exporter，缓存起来。
 
 export方法先判断是否需要延迟暴露（这里我们使用的是不延迟暴露），然后执行doExport方法。
 
