@@ -134,12 +134,38 @@ registry://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?application
     
 doExportUrlsFor1Protocol根据不同的协议将服务以URL形式暴露。如果scope配置为none则不暴露，如果服务未配置成remote，则本地暴露exportLocal，如果未配置成local，则注册服务registryProcotol。
 	
- 这个方法中会把上面的注册信息的URL转换成协议信息URL：
+ 这里的URL是：
     
 ```
 dubbo://192.168.1.100:20880/dubbo.common.hello.service.HelloService?anyhost=true&application=dubbo-provider&application.version=1.0&delay=5000&dubbo=2.5.3&environment=product&interface=dubbo.common.hello.service.HelloService&methods=sayHello&organization=china&owner=cheng.xi&pid=2939&side=provider&timestamp=1488898464953
 ```
-接下来会调用进行服务的发布：
+
+这时候会先做本地暴露，exportLocal(url);：
+
+```
+private void exportLocal(URL url) {
+    if (!Constants.LOCAL_PROTOCOL.equalsIgnoreCase(url.getProtocol())) {
+    	//这时候转成本地暴露的url：injvm://127.0.0.1/dubbo.common.hello.service.HelloService?anyhost=true&
+        //application=dubbo-provider&application.version=1.0&dubbo=2.5.3&environment=product&
+        //interface=dubbo.common.hello.service.HelloService&methods=sayHello&
+        //organization=china&owner=cheng.xi&pid=720&side=provider&timestamp=1489716708276
+        URL local = URL.valueOf(url.toFullString())
+                .setProtocol(Constants.LOCAL_PROTOCOL)
+                .setHost(NetUtils.LOCALHOST)
+                .setPort(0);
+        //首先还是先获得Invoker
+        //然后导出成Exporter，并缓存
+        //这里的proxyFactory实际是JavassistProxyFactory
+        //有关详细的获得Invoke以及exporter会在下面的流程解析，在本地暴露这个流程就不再说明。
+        Exporter<?> exporter = protocol.export(
+                proxyFactory.getInvoker(ref, (Class) interfaceClass, local));
+        exporters.add(exporter);
+        logger.info("Export dubbo service " + interfaceClass.getName() +" to local registry");
+    }
+}
+```
+
+接下来是暴露为远程服务，跟本地暴露的流程一样还是先获取Invoker，然后导出成Exporter：
     
 ```
 //根据服务具体实现，实现接口，以及registryUrl通过ProxyFactory将HelloServiceImpl封装成一个本地执行的Invoker
@@ -152,11 +178,14 @@ dubbo://192.168.1.100:20880/dubbo.common.hello.service.HelloService?anyhost=true
  //这里的protocol是上面列出的生成的代码
  Exporter<?> exporter = protocol.export(invoker);
 ```
-**关于Invoker，Exporter等的解释参见下面的内容。**
-   
-这里还是以dubbo协议为例子，对应的Protocol为DubboProtocol，使用SPI机制获取到DubboProtocol的过程中，就已经进行了ProtocolFilterWrapper、ProtocolListenerWrapper、RegistryProtocol等的包装。
+**关于Invoker，Exporter等的解释参见最下面的内容。**
 
-## 获取Invoker，服务实现类转换成Invoker
+## 暴露远程服务时的获取Invoker过程
+服务实现类转换成Invoker，大概的步骤是：
+
+1. 根据上面生成的proxyFactory方法调用具体的ProxyFactory实现类的getInvoker方法获取Invoker。
+2. getInvoker的过程是，首先对实现类做一个包装，生成一个包装后的类。
+3. 然后新创建一个Invoker实例，这个Invoker中包含着生成的Wrapper类，Wrapper类中有具体的实现类。
 
 ```
 Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, registryURL.addParameterAndEncoded(Constants.EXPORT_KEY, url.toFullString()));
@@ -189,6 +218,8 @@ public <T> Invoker<T> getInvoker(T proxy, Class<T> type, URL url) {
     //该类是手动生成的
     //如果类是以$开头，就使用接口类型获取，其他的使用实现类获取
     final Wrapper wrapper = Wrapper.getWrapper(proxy.getClass().getName().indexOf('$') < 0 ? proxy.getClass() : type);
+    //返回一个Invoker实例，doInvoke方法中直接返回上面wrapper的invokeMethod
+    //关于生成的wrapper，请看下面列出的生成的代码，其中invokeMethod方法中就有实现类对实际方法的调用
     return new AbstractProxyInvoker<T>(proxy, type, url) {
         @Override
         protected Object doInvoke(T proxy, String methodName, 
@@ -200,11 +231,7 @@ public <T> Invoker<T> getInvoker(T proxy, Class<T> type, URL url) {
 }
 ```
 
-生成wrapper类的过程：
-
-`final Wrapper wrapper = Wrapper.getWrapper(proxy.getClass().getName().indexOf('$') < 0 ? proxy.getClass() : type);`
-
-首先看getWrapper方法：
+生成wrapper类的过程，首先看getWrapper方法：
 
 ```
 public static Wrapper getWrapper(Class<?> c){
@@ -294,21 +321,36 @@ public class Wrapper1 extends Wrapper {
 }
 ```
 
-生成完Wrapper以后，返回一个AbstractProxyInvoker实例。至此生成Invoker的步骤就完成了。接着就是暴露Invoker。
+生成完Wrapper以后，返回一个AbstractProxyInvoker实例。至此生成Invoker的步骤就完成了。可以看到Invoker执行方法的时候，会调用Wrapper的invokeMethod，这个方法中会有真实的实现类调用真实方法的代码。
 
-## 暴露封装着服务的Invoker
+## 暴露远程服务时导出Invoker为Exporter
+Invoker导出为Exporter分为两种情况，第一种是Registry类型的Invoker，第二种是其他协议类型的Invoker，分开解析。
+
+代码入口：
 
 ```
 Exporter<?> exporter = protocol.export(invoker);
 ```
-protocol是上面列出的动态生成的代码，会先调用ProtocolListenerWrapper，这个Wrapper负责初始化暴露和引用服务的监听器。代码如下：
+
+### Registry类型的Invoker处理过程
+
+大概的步骤是：
+
+1. 经过两个不用做任何处理的Wrapper类，然后到达RegistryProtocol中。
+2. 通过具体的协议导出Invoker为Exporter。
+3. 注册服务到注册中心。
+4. 订阅注册中心的服务。
+5. 生成一个新的Exporter实例，将上面的Exporter进行引入，然后返回。
+
+protocol是上面列出的动态生成的代码，会先调用ProtocolListenerWrapper，这个Wrapper负责初始化暴露和引用服务的监听器。对于Registry类型的不做处理，代码如下：
 
 ```
 public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
-	//registry类型的Invoker
+	//registry类型的Invoker，不需要做处理
     if (Constants.REGISTRY_PROTOCOL.equals(invoker.getUrl().getProtocol())) {
         return protocol.export(invoker);
     }
+    //非Registry类型的Invoker，需要被监听器包装
     return new ListenerExporterWrapper<T>(protocol.export(invoker), 
             Collections.unmodifiableList(ExtensionLoader.getExtensionLoader(ExporterListener.class)
                     .getActivateExtension(invoker.getUrl(), Constants.EXPORTER_LISTENER_KEY)));
@@ -319,19 +361,21 @@ public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
 
 ```
 public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
+	//Registry类型的Invoker不做处理
     if (Constants.REGISTRY_PROTOCOL.equals(invoker.getUrl().getProtocol())) {
         return protocol.export(invoker);
     }
+    //非Registry类型的Invoker需要先构建调用链，然后再导出
     return protocol.export(buildInvokerChain(invoker, Constants.SERVICE_FILTER_KEY, Constants.PROVIDER));
 }
 ```
 
-接着就会调用RegistryProtocol的export方法，RegistryProtocol负责注册服务到注册中心和向注册中心订阅服务。代码如下：
+这里我们先解析的是Registry类型的Invoker，接着就会调用RegistryProtocol的export方法，RegistryProtocol负责注册服务到注册中心和向注册中心订阅服务。代码如下：
 
 ```
 public <T> Exporter<T> export(final Invoker<T> originInvoker) throws RpcException {
     //export invoker
-    //这里就交给了具体的协议去暴露服务
+    //这里就交给了具体的协议去暴露服务（先不解析，留在后面，可以先去后面看下导出过程）
     final ExporterChangeableWrapper<T> exporter = doLocalExport(originInvoker);
     //registry provider
     //根据invoker中的url获取Registry实例
@@ -380,309 +424,11 @@ public <T> Exporter<T> export(final Invoker<T> originInvoker) throws RpcExceptio
 }
 ```
 
-### 交给具体的协议进行服务暴露
-doLocalExport(invoker)：
+#### 交给具体的协议去暴露服务
+先不解析，留在后面，可以先去后面看下导出过程，然后再回来接着看注册到注册中心的过程。
 
-```
-private <T> ExporterChangeableWrapper<T>  doLocalExport(final Invoker<T> originInvoker){
-	//原始的invoker中的url：registry://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?application=dubbo-provider&application.version=1.0&dubbo=2.5.3
-    //&environment=product&
-    //export=dubbo%3A%2F%2F10.42.0.1%3A20880%2Fdubbo.common.hello.service.HelloService%3Fanyhost%3Dtrue%26application%3Ddubbo-provider%26
-    //application.version%3D1.0%26dubbo%3D2.5.3%26environment%3Dproduct%26interface%3Ddubbo.common.hello.service.HelloService%26methods%3DsayHello%26
-    //organization%3Dchina%26owner%3Dcheng.xi%26pid%3D7876%26side%3Dprovider%26timestamp%3D1489057305001&
-    //organization=china&owner=cheng.xi&pid=7876&registry=zookeeper&timestamp=1489057304900
-    //从原始的invoker中得到的key：dubbo://10.42.0.1:20880/dubbo.common.hello.service.HelloService?anyhost=true&application=dubbo-provider&
-    //application.version=1.0&dubbo=2.5.3&environment=product&interface=dubbo.common.hello.service.HelloService&
-    //methods=sayHello&organization=china&owner=cheng.xi&pid=7876&side=provider&timestamp=1489057305001
-    String key = getCacheKey(originInvoker);
-    ExporterChangeableWrapper<T> exporter = (ExporterChangeableWrapper<T>) bounds.get(key);
-    if (exporter == null) {
-        synchronized (bounds) {
-            exporter = (ExporterChangeableWrapper<T>) bounds.get(key);
-            if (exporter == null) {
-                final Invoker<?> invokerDelegete = new InvokerDelegete<T>(originInvoker, getProviderUrl(originInvoker));
-                //此处protocol还是最上面生成的代码，调用代码中的export方法，会根据协议名选择调用具体的实现类
-                //这里我们需要调用DubboProtocol的export方法
-                //这里的invoker在上一步做了修改
-                exporter = new ExporterChangeableWrapper<T>((Exporter<T>)protocol.export(invokerDelegete), originInvoker);
-                bounds.put(key, exporter);
-            }
-        }
-    }
-    return (ExporterChangeableWrapper<T>) exporter;
-}
-```
-
-下面去具体的DubboProtocol中查看调用，在调用DubboProtocol之前，还是先经过ProtocolListenerWrapper初始化监听器，再经过ProtocolFilterWrapper初始化所有的Filter，最后到了DubboProtocol的export方法，这里进行暴露服务：
-
-```
-public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
-	//dubbo://10.42.0.1:20880/dubbo.common.hello.service.HelloService?anyhost=true&application=dubbo-provider&
-    //application.version=1.0&dubbo=2.5.3&environment=product&interface=dubbo.common.hello.service.HelloService&
-    //methods=sayHello&organization=china&owner=cheng.xi&pid=7876&side=provider&timestamp=1489057305001
-    URL url = invoker.getUrl();
-
-    // export service.
-    //key由serviceName，port，version，group组成
-    //当nio客户端发起远程调用时，nio服务端通过此key来决定调用哪个Exporter，也就是执行的Invoker。
-    String key = serviceKey(url);
-    //将Invoker转换成Exporter
-    DubboExporter<T> exporter = new DubboExporter<T>(invoker, key, exporterMap);
-    //缓存要暴露的服务，key是上面生成的
-    exporterMap.put(key, exporter);
-
-    //export an stub service for dispaching event
-    Boolean isStubSupportEvent = url.getParameter(Constants.STUB_EVENT_KEY,Constants.DEFAULT_STUB_EVENT);
-    Boolean isCallbackservice = url.getParameter(Constants.IS_CALLBACK_SERVICE, false);
-    if (isStubSupportEvent && !isCallbackservice){
-        String stubServiceMethods = url.getParameter(Constants.STUB_EVENT_METHODS_KEY);
-        if (stubServiceMethods == null || stubServiceMethods.length() == 0 ){
-            if (logger.isWarnEnabled()){
-                logger.warn(new IllegalStateException("consumer [" +url.getParameter(Constants.INTERFACE_KEY) +
-                        "], has set stubproxy support event ,but no stub methods founded."));
-            }
-        } else {
-            stubServiceMethodsMap.put(url.getServiceKey(), stubServiceMethods);
-        }
-    }
-	//根据URL绑定IP与端口，建立NIO框架的Server
-    openServer(url);
-
-    return exporter;
-}
-```
-上面将Invoker转换成Exporter之后，缓存起来，接着调用openServer方法创建NIO Server：
-
-```
-private void openServer(URL url) {
-    // find server.
-    //key是IP:PORT
-    String key = url.getAddress();
-    //client 也可以暴露一个只有server可以调用的服务。
-    boolean isServer = url.getParameter(Constants.IS_SERVER_KEY,true);
-    if (isServer) {
-    	
-        ExchangeServer server = serverMap.get(key);
-        //同协议的服务，第一个暴露服务的时候创建server
-        if (server == null) {
-            serverMap.put(key, createServer(url));
-        } else {
-        	//同协议的服务后来暴露服务的则使用第一次创建的同一Server
-            //server支持reset,配合override功能使用
-            server.reset(url);
-        }
-    }
-}
-```
-同一JVM中，相同协议的服务，共享同一个Server，不同服务中只有accept、idleTimeout、threads、heartbeat参数的变化会引用Server中属性的变化，但是同JVM中，同协议的服务均是引用同一个Server。第一个服务暴露是创建Server，后来的服务暴露最多是重置个别参数。
-
-继续看createServer方法：
-
-```
-private ExchangeServer createServer(URL url) {
-    //默认开启server关闭时发送readonly事件
-    url = url.addParameterIfAbsent(Constants.CHANNEL_READONLYEVENT_SENT_KEY, Boolean.TRUE.toString());
-    //默认开启heartbeat
-    url = url.addParameterIfAbsent(Constants.HEARTBEAT_KEY, String.valueOf(Constants.DEFAULT_HEARTBEAT));
-    //默认使用netty
-    String str = url.getParameter(Constants.SERVER_KEY, Constants.DEFAULT_REMOTING_SERVER);
-
-    if (str != null && str.length() > 0 && ! ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(str))
-        throw new RpcException("Unsupported server type: " + str + ", url: " + url);
-
-    url = url.addParameter(Constants.CODEC_KEY, Version.isCompatibleVersion() ? COMPATIBLE_CODEC_NAME : DubboCodec.NAME);
-    ExchangeServer server;
-    try {
-    	//Exchangers是门面类，里面封装的是Exchanger的逻辑。
-        //Exchanger默认只有一个实现HeaderExchanger.
-        //Exchanger负责数据交换和网络通信。
-        //从Protocol进入Exchanger，标志着程序进入了remote层。
-        server = Exchangers.bind(url, requestHandler);
-    } catch (RemotingException e) {
-        throw new RpcException("Fail to start server(url: " + url + ") " + e.getMessage(), e);
-    }
-    str = url.getParameter(Constants.CLIENT_KEY);
-    if (str != null && str.length() > 0) {
-        Set<String> supportedTypes = ExtensionLoader.getExtensionLoader(Transporter.class).getSupportedExtensions();
-        if (!supportedTypes.contains(str)) {
-            throw new RpcException("Unsupported client type: " + str);
-        }
-    }
-    return server;
-}
-```
-
-Exchangers.bind方法：
-
-```
-public static ExchangeServer bind(URL url, ExchangeHandler handler) throws RemotingException {
-    url = url.addParameterIfAbsent(Constants.CODEC_KEY, "exchange");
-    //getExchanger方法根据url获取到一个默认的实现HeaderExchanger
-    //调用HeaderExchanger的bind方法
-    return getExchanger(url).bind(url, handler);
-}
-```
-
-HeaderExchanger的bind方法：
-
-```
-public ExchangeServer bind(URL url, ExchangeHandler handler) throws RemotingException {
-	//直接返回一个HeaderExchangeServer
-    //先创建一个HeaderExchangeHandler
-    //再创建一个DecodeHandler
-    //最后调用Transporters.bind
-    return new HeaderExchangeServer(Transporters.bind(url, new DecodeHandler(new HeaderExchangeHandler(handler))));
-}
-```
-
-Transports的bind方法：
-
-```
-public static Server bind(URL url, ChannelHandler... handlers) throws RemotingException {
-    ChannelHandler handler;
-    if (handlers.length == 1) {
-        handler = handlers[0];
-    } else {
-        handler = new ChannelHandlerDispatcher(handlers);
-    }
-    //getTransporter()获取一个Adaptive的Transporter
-    //然后调用bind方法（默认是NettyTransporter的bind方法）
-    return getTransporter().bind(url, handler);
-}
-```
-
-getTransporter()生成的Transporter的代码如下：
-
-```
-import com.alibaba.dubbo.common.extension.ExtensionLoader;
-public class Transporter$Adpative implements com.alibaba.dubbo.remoting.Transporter {
-    public com.alibaba.dubbo.remoting.Server bind(com.alibaba.dubbo.common.URL arg0, com.alibaba.dubbo.remoting.ChannelHandler arg1) throws com.alibaba.dubbo.common.URL {
-        if (arg0 == null) throw new IllegalArgumentException("url == null");
-        com.alibaba.dubbo.common.URL url = arg0;
-        //Server默认使用netty
-        String extName = url.getParameter("server", url.getParameter("transporter", "netty"));
-        if(extName == null) throw new IllegalStateException("Fail to get extension(com.alibaba.dubbo.remoting.Transporter) name from url(" + url.toString() + ") use keys([server, transporter])");
-        //获取到一个NettyTransporter
-        com.alibaba.dubbo.remoting.Transporter extension = (com.alibaba.dubbo.remoting.Transporter)ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.remoting.Transporter.class).getExtension(extName);
-        //调用NettyTransporter的bind方法
-        return extension.bind(arg0, arg1);
-    }
-    
-public com.alibaba.dubbo.remoting.Client connect(com.alibaba.dubbo.common.URL arg0, com.alibaba.dubbo.remoting.ChannelHandler arg1) throws com.alibaba.dubbo.common.URL {
-    if (arg0 == null) throw new IllegalArgumentException("url == null");
-    com.alibaba.dubbo.common.URL url = arg0;
-    
-    String extName = url.getParameter("client", url.getParameter("transporter", "netty"));
-    
-    if(extName == null) throw new IllegalStateException("Fail to get extension(com.alibaba.dubbo.remoting.Transporter) name from url(" + url.toString() + ") use keys([client, transporter])");
-    
-    com.alibaba.dubbo.remoting.Transporter extension = (com.alibaba.dubbo.remoting.Transporter)ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.remoting.Transporter.class).getExtension(extName);
-    
-    return extension.connect(arg0, arg1);
-}
-}
-```
-
-NettyTransporter的bind方法：
-
-```
- public Server bind(URL url, ChannelHandler listener) throws RemotingException {
- 	//创建一个Server
-    return new NettyServer(url, listener);
-}
-```
-newNettyServer创建一个Server，最终在AbstractServer初始化：
-
-```
-public AbstractServer(URL url, ChannelHandler handler) throws RemotingException {
-    super(url, handler);
-    localAddress = getUrl().toInetSocketAddress();
-    String host = url.getParameter(Constants.ANYHOST_KEY, false) 
-                    || NetUtils.isInvalidLocalHost(getUrl().getHost()) 
-                    ? NetUtils.ANYHOST : getUrl().getHost();
-    bindAddress = new InetSocketAddress(host, getUrl().getPort());
-    this.accepts = url.getParameter(Constants.ACCEPTS_KEY, Constants.DEFAULT_ACCEPTS);
-    this.idleTimeout = url.getParameter(Constants.IDLE_TIMEOUT_KEY, Constants.DEFAULT_IDLE_TIMEOUT);
-    try {
-        doOpen();
-        if (logger.isInfoEnabled()) {
-            logger.info("Start " + getClass().getSimpleName() + " bind " + getBindAddress() + ", export " + getLocalAddress());
-        }
-    } catch (Throwable t) {
-        throw new RemotingException(url.toInetSocketAddress(), null, "Failed to bind " + getClass().getSimpleName() 
-                                    + " on " + getLocalAddress() + ", cause: " + t.getMessage(), t);
-    }
-    if (handler instanceof WrappedChannelHandler ){
-        executor = ((WrappedChannelHandler)handler).getExecutor();
-    }
-}
-```
-然后调用doOpen方法：
-
-```
-protected void doOpen() throws Throwable {
-    NettyHelper.setNettyLoggerFactory();
-    //boss线程池
-    ExecutorService boss = Executors.newCachedThreadPool(new NamedThreadFactory("NettyServerBoss", true));
-    //worker线程池
-    ExecutorService worker = Executors.newCachedThreadPool(new NamedThreadFactory("NettyServerWorker", true));
-    //ChannelFactory，没有指定工作者线程数量，就使用cpu+1
-    ChannelFactory channelFactory = new NioServerSocketChannelFactory(boss, worker, getUrl().getPositiveParameter(Constants.IO_THREADS_KEY, Constants.DEFAULT_IO_THREADS));
-    bootstrap = new ServerBootstrap(channelFactory);
-
-    final NettyHandler nettyHandler = new NettyHandler(getUrl(), this);
-    channels = nettyHandler.getChannels();
-    // https://issues.jboss.org/browse/NETTY-365
-    // https://issues.jboss.org/browse/NETTY-379
-    // final Timer timer = new HashedWheelTimer(new NamedThreadFactory("NettyIdleTimer", true));
-    bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
-        public ChannelPipeline getPipeline() {
-            NettyCodecAdapter adapter = new NettyCodecAdapter(getCodec() ,getUrl(), NettyServer.this);
-            ChannelPipeline pipeline = Channels.pipeline();
-            /*int idleTimeout = getIdleTimeout();
-            if (idleTimeout > 10000) {
-                pipeline.addLast("timer", new IdleStateHandler(timer, idleTimeout / 1000, 0, 0));
-            }*/
-            pipeline.addLast("decoder", adapter.getDecoder());
-            pipeline.addLast("encoder", adapter.getEncoder());
-            pipeline.addLast("handler", nettyHandler);
-            return pipeline;
-        }
-    });
-    // bind
-    channel = bootstrap.bind(getBindAddress());
-}
-```
-
-doOpen方法创建Netty的Server端并打开。
-
-- NIO框架接受到消息后，先由NettyCodecAdapter解码，再由NettyHandler处理具体的业务逻辑，再由NettyCodecAdapter编码后发送。
-- NettyServer既是Server又是Handler。
-- HeaderExchangerServer只是Server。
-- MultiMessageHandler是多消息处理Handler。
-- HeartbeatHandler是处理心跳事件的Handler。
-- AllChannelHandler是消息派发器，负责将请求放入线程池，并执行请求。
-- DecodeHandler是编解码Handler。
-- HeaderExchangerHandler是信息交换Handler，将请求转化成请求响应模式与同步转异步模式。
-- RequestHandler是最后执行的Handler，会在协议层选择Exporter后选择Invoker，进而执行Filter与Invoker，最终执行请求服务实现类方法。
-- Channel直接触发事件并执行Handler，Channel在有客户端连接Server的时候触发创建并封装成NettyChannel，再由HeaderExchangerHandler创建HeaderExchangerChannel，负责请求响应模式的处理。
-- NettyChannel其实是个Handler，HeaderExchangerChannel是个Channel，
-- 消息的序列化与反序列化工作在NettyCodecAdapter中发起完成。
-
-当有客户端连接Server时的连接过程：
-
-- NettyHandler.connected()
-- NettyServer.connected()
-- MultiMessageHandler.connected()
-- HeartbeatHandler.connected()
-- AllChannelHandler.connected()
-- DecodeHandler.connected()
-- HeaderExchangerHandler.connected()
-- requestHandler.connected()
-- 执行服务的onconnect事件的监听方法
-
-### 注册到注册中心
-上面讲完了交给具体的协议进行暴露，并且返回了一个Server，接下来看下一步，代码是在RegistryProtocol的export方法：
+#### 注册到注册中心
+具体的协议进行暴露并且返回了一个ExporterChangeableWrapper之后，接下来看下一步连接注册中心并注册到注册中中心，代码是在RegistryProtocol的export方法：
 
 ```
 //此步已经分析完
@@ -812,6 +558,430 @@ public class ZookeeperTransporter$Adpative implements com.alibaba.dubbo.remoting
 所以zookeeperTransporter.connect(url)就是调用的ZookeeperClient的connect方法。直接返回一个ZkclientZookeeperClient实例。最后添加zkClient的监听。
 
 获取到了Registry实例之后，下一步获取要注册到注册中心的url。然后调用registry.register(registedProviderUrl)注册到注册中心。具体的调用暂先不解析。最后注册一个订阅覆盖配置的监听器，返回Exporter。
+
+
+### 交给具体的协议进行服务暴露
+这里也就是非Registry类型的Invoker的导出过程。
+
+doLocalExport(invoker)：
+
+```
+private <T> ExporterChangeableWrapper<T>  doLocalExport(final Invoker<T> originInvoker){
+	//原始的invoker中的url：
+    //registry://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?
+    //application=dubbo-provider&application.version=1.0&dubbo=2.5.3
+    //&environment=product&export=dubbo%3A%2F%2F10.42.0.1%3A20880%2F
+    //dubbo.common.hello.service.HelloService%3Fanyhost%3Dtrue%26application%3Ddubbo-provider%26
+    //application.version%3D1.0%26dubbo%3D2.5.3%26environment%3Dproduct%26
+    //interface%3Ddubbo.common.hello.service.HelloService%26methods%3DsayHello%26
+    //organization%3Dchina%26owner%3Dcheng.xi%26pid%3D7876%26side%3Dprovider%26timestamp%3D1489057305001&
+    //organization=china&owner=cheng.xi&pid=7876&registry=zookeeper&timestamp=1489057304900
+    
+    //从原始的invoker中得到的key：
+    //dubbo://10.42.0.1:20880/dubbo.common.hello.service.HelloService?anyhost=true&application=dubbo-provider&
+    //application.version=1.0&dubbo=2.5.3&environment=product&interface=dubbo.common.hello.service.HelloService&
+    //methods=sayHello&organization=china&owner=cheng.xi&pid=7876&side=provider&timestamp=1489057305001
+    String key = getCacheKey(originInvoker);
+    ExporterChangeableWrapper<T> exporter = (ExporterChangeableWrapper<T>) bounds.get(key);
+    if (exporter == null) {
+        synchronized (bounds) {
+            exporter = (ExporterChangeableWrapper<T>) bounds.get(key);
+            if (exporter == null) {
+            	//得到一个Invoker代理，里面包含原来的Invoker
+                final Invoker<?> invokerDelegete = new InvokerDelegete<T>(originInvoker, getProviderUrl(originInvoker));
+                //此处protocol还是最上面生成的代码，调用代码中的export方法，会根据协议名选择调用具体的实现类
+                //这里我们需要调用DubboProtocol的export方法
+                //这里的使用具体协议进行导出的invoker是个代理invoker
+                //导出完之后，返回一个新的ExporterChangeableWrapper实例
+                exporter = new ExporterChangeableWrapper<T>((Exporter<T>)protocol.export(invokerDelegete), originInvoker);
+                bounds.put(key, exporter);
+            }
+        }
+    }
+    return (ExporterChangeableWrapper<T>) exporter;
+}
+```
+
+这里`protocol.export(invokerDelegete)`就要去具体的DubboProtocol中执行了，DubboProtocol的外面包裹着ProtocolFilterWrapper，再外面还包裹着ProtocolListenerWrapper。会先经过ProtocolListenerWrapper：
+
+```
+public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
+	//Registry类型的Invoker
+    if (Constants.REGISTRY_PROTOCOL.equals(invoker.getUrl().getProtocol())) {
+        return protocol.export(invoker);
+    }
+   	//其他具体协议类型的Invoker
+    //先进行导出protocol.export(invoker)
+    //然后获取自适应的监听器
+    //最后返回的是包装了监听器的Exporter
+    return new ListenerExporterWrapper<T>(protocol.export(invoker), 
+            Collections.unmodifiableList(ExtensionLoader.getExtensionLoader(ExporterListener.class)
+                    .getActivateExtension(invoker.getUrl(), Constants.EXPORTER_LISTENER_KEY)));
+}
+```
+
+再经过ProtocolFilterWrapper：
+
+```
+public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
+	//Registry类型的Invoker
+    if (Constants.REGISTRY_PROTOCOL.equals(invoker.getUrl().getProtocol())) {
+        return protocol.export(invoker);
+    }
+    //其他具体协议类型的Invoker
+    //先构建Filter链，然后再导出
+    return protocol.export(buildInvokerChain(invoker, Constants.SERVICE_FILTER_KEY, Constants.PROVIDER));
+}
+```
+
+查看下构建Invoker链的方法：
+
+```
+private static <T> Invoker<T> buildInvokerChain(final Invoker<T> invoker, String key, String group) {
+	//我们要处理的那个Invoker作为处理链的最后一个
+    Invoker<T> last = invoker;
+    //根据key和group获取自动激活的Filter
+    List<Filter> filters = ExtensionLoader.getExtensionLoader(Filter.class).getActivateExtension(invoker.getUrl(), key, group);
+    if (filters.size() > 0) {
+    	//把所有的过滤器都挨个连接起来，最后一个是我们真正的Invoker
+        for (int i = filters.size() - 1; i >= 0; i --) {
+            final Filter filter = filters.get(i);
+            final Invoker<T> next = last;
+            last = new Invoker<T>() {
+
+                public Class<T> getInterface() {
+                    return invoker.getInterface();
+                }
+
+                public URL getUrl() {
+                    return invoker.getUrl();
+                }
+
+                public boolean isAvailable() {
+                    return invoker.isAvailable();
+                }
+
+                public Result invoke(Invocation invocation) throws RpcException {
+                    return filter.invoke(next, invocation);
+                }
+
+                public void destroy() {
+                    invoker.destroy();
+                }
+
+                @Override
+                public String toString() {
+                    return invoker.toString();
+                }
+            };
+        }
+    }
+    return last;
+}
+```
+
+接着就到了DubboProtocol的export方法，这里进行暴露服务：
+
+```
+public <T> Exporter<T> export(Invoker<T> invoker) throws RpcException {
+	//dubbo://10.42.0.1:20880/dubbo.common.hello.service.HelloService?
+    //anyhost=true&application=dubbo-provider&
+    //application.version=1.0&dubbo=2.5.3&environment=product&
+    //interface=dubbo.common.hello.service.HelloService&
+    //methods=sayHello&organization=china&owner=cheng.xi&
+    //pid=7876&side=provider&timestamp=1489057305001
+    URL url = invoker.getUrl();
+
+    // export service.
+    //key由serviceName，port，version，group组成
+    //当nio客户端发起远程调用时，nio服务端通过此key来决定调用哪个Exporter，也就是执行的Invoker。
+    //dubbo.common.hello.service.HelloService:20880
+    String key = serviceKey(url);
+    //将Invoker转换成Exporter
+    //直接new一个新实例
+    //没做啥处理，就是做一些赋值操作
+    //这里的exporter就包含了invoker
+    DubboExporter<T> exporter = new DubboExporter<T>(invoker, key, exporterMap);
+    //缓存要暴露的服务，key是上面生成的
+    exporterMap.put(key, exporter);
+
+    //export an stub service for dispaching event
+    //是否支持本地存根
+    //远程服务后，客户端通常只剩下接口，而实现全在服务器端，
+    //但提供方有些时候想在客户端也执行部分逻辑，比如：做ThreadLocal缓存，
+    //提前验证参数，调用失败后伪造容错数据等等，此时就需要在API中带上Stub，
+    //客户端生成Proxy实，会把Proxy通过构造函数传给Stub，
+    //然后把Stub暴露组给用户，Stub可以决定要不要去调Proxy。
+    Boolean isStubSupportEvent = url.getParameter(Constants.STUB_EVENT_KEY,Constants.DEFAULT_STUB_EVENT);
+    Boolean isCallbackservice = url.getParameter(Constants.IS_CALLBACK_SERVICE, false);
+    if (isStubSupportEvent && !isCallbackservice){
+        String stubServiceMethods = url.getParameter(Constants.STUB_EVENT_METHODS_KEY);
+        if (stubServiceMethods == null || stubServiceMethods.length() == 0 ){
+        } else {
+            stubServiceMethodsMap.put(url.getServiceKey(), stubServiceMethods);
+        }
+    }
+	//根据URL绑定IP与端口，建立NIO框架的Server
+    openServer(url);
+
+    return exporter;
+}
+```
+上面得到的Exporter会被放到缓存中去，key就是上面生成的，客户端就可以发请求根据key找到Exporter，然后找到invoker进行调用了。接下来是创建服务器并监听端口。
+
+接着调用openServer方法创建NIO Server进行监听：
+
+```
+private void openServer(URL url) {
+    // find server.
+    //key是IP:PORT
+    //192.168.110.197:20880
+    String key = url.getAddress();
+    //client 也可以暴露一个只有server可以调用的服务。
+    boolean isServer = url.getParameter(Constants.IS_SERVER_KEY,true);
+    if (isServer) {
+    	
+        ExchangeServer server = serverMap.get(key);
+        //同一JVM中，同协议的服务，共享同一个Server，
+        //第一个暴露服务的时候创建server，
+        //以后相同协议的服务都使用同一个server
+        if (server == null) {
+            serverMap.put(key, createServer(url));
+        } else {
+        	//同协议的服务后来暴露服务的则使用第一次创建的同一Server
+            //server支持reset,配合override功能使用
+            //accept、idleTimeout、threads、heartbeat参数的变化会引起Server的属性发生变化
+            //这时需要重新设置Server
+            server.reset(url);
+        }
+    }
+}
+```
+
+继续看createServer方法：
+
+```
+//url为：
+//dubbo://192.168.110.197:20880/dubbo.common.hello.service.HelloService?
+//anyhost=true&application=dubbo-provider&
+//application.version=1.0&dubbo=2.5.3&environment=product&
+//interface=dubbo.common.hello.service.HelloService&
+//methods=sayHello&organization=china&owner=cheng.xi&
+//pid=720&side=provider&timestamp=1489716708276
+private ExchangeServer createServer(URL url) {
+    //默认开启server关闭时发送readonly事件
+    url = url.addParameterIfAbsent(Constants.CHANNEL_READONLYEVENT_SENT_KEY, Boolean.TRUE.toString());
+    //默认开启heartbeat
+    url = url.addParameterIfAbsent(Constants.HEARTBEAT_KEY, String.valueOf(Constants.DEFAULT_HEARTBEAT));
+    //默认使用netty
+    String str = url.getParameter(Constants.SERVER_KEY, Constants.DEFAULT_REMOTING_SERVER);
+
+    if (str != null && str.length() > 0 && ! ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(str))
+        throw new RpcException("Unsupported server type: " + str + ", url: " + url);
+
+    url = url.addParameter(Constants.CODEC_KEY, Version.isCompatibleVersion() ? COMPATIBLE_CODEC_NAME : DubboCodec.NAME);
+    ExchangeServer server;
+    try {
+    	//Exchangers是门面类，里面封装的是Exchanger的逻辑。
+        //Exchanger默认只有一个实现HeaderExchanger.
+        //Exchanger负责数据交换和网络通信。
+        //从Protocol进入Exchanger，标志着程序进入了remote层。
+        //这里requestHandler是ExchangeHandlerAdapter
+        server = Exchangers.bind(url, requestHandler);
+    } catch (RemotingException e) { }
+    str = url.getParameter(Constants.CLIENT_KEY);
+    if (str != null && str.length() > 0) {
+        Set<String> supportedTypes = ExtensionLoader.getExtensionLoader(Transporter.class).getSupportedExtensions();
+        if (!supportedTypes.contains(str)) {
+            throw new RpcException("Unsupported client type: " + str);
+        }
+    }
+    return server;
+}
+```
+
+Exchangers.bind方法：
+
+```
+public static ExchangeServer bind(URL url, ExchangeHandler handler) throws RemotingException {
+    url = url.addParameterIfAbsent(Constants.CODEC_KEY, "exchange");
+    //getExchanger方法根据url获取到一个默认的实现HeaderExchanger
+    //调用HeaderExchanger的bind方法
+    return getExchanger(url).bind(url, handler);
+}
+```
+
+HeaderExchanger的bind方法：
+
+```
+public ExchangeServer bind(URL url, ExchangeHandler handler) throws RemotingException {
+	//直接返回一个HeaderExchangeServer
+    //先创建一个HeaderExchangeHandler
+    //再创建一个DecodeHandler
+    //最后调用Transporters.bind
+    return new HeaderExchangeServer(Transporters.bind(url, new DecodeHandler(new HeaderExchangeHandler(handler))));
+}
+```
+这里会先创建一个HeaderExchangerHandler，包含着ExchangeHandlerAdapter，接着创建一个DecodeHandler，会包含前面的handler，接下来调用Transporters的bind方法，返回一个Server，接着用HeaderExchangeServer包装一下，就返回给Protocol层了。
+
+Transports的bind方法：
+
+```
+public static Server bind(URL url, ChannelHandler... handlers) throws RemotingException {
+    ChannelHandler handler;
+    if (handlers.length == 1) {
+        handler = handlers[0];
+    } else {
+    	//如果有多个handler的话，需要使用分发器包装下
+        handler = new ChannelHandlerDispatcher(handlers);
+    }
+    //getTransporter()获取一个Adaptive的Transporter
+    //然后调用bind方法（默认是NettyTransporter的bind方法）
+    return getTransporter().bind(url, handler);
+}
+```
+
+getTransporter()生成的Transporter的代码如下：
+
+```
+import com.alibaba.dubbo.common.extension.ExtensionLoader;
+public class Transporter$Adpative implements com.alibaba.dubbo.remoting.Transporter {
+    public com.alibaba.dubbo.remoting.Server bind(com.alibaba.dubbo.common.URL arg0, com.alibaba.dubbo.remoting.ChannelHandler arg1) throws com.alibaba.dubbo.common.URL {
+        if (arg0 == null) throw new IllegalArgumentException("url == null");
+        com.alibaba.dubbo.common.URL url = arg0;
+        //Server默认使用netty
+        String extName = url.getParameter("server", url.getParameter("transporter", "netty"));
+        if(extName == null) throw new IllegalStateException("Fail to get extension(com.alibaba.dubbo.remoting.Transporter) name from url(" + url.toString() + ") use keys([server, transporter])");
+        //获取到一个NettyTransporter
+        com.alibaba.dubbo.remoting.Transporter extension = (com.alibaba.dubbo.remoting.Transporter)ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.remoting.Transporter.class).getExtension(extName);
+        //调用NettyTransporter的bind方法
+        return extension.bind(arg0, arg1);
+    }
+    
+public com.alibaba.dubbo.remoting.Client connect(com.alibaba.dubbo.common.URL arg0, com.alibaba.dubbo.remoting.ChannelHandler arg1) throws com.alibaba.dubbo.common.URL {
+    if (arg0 == null) throw new IllegalArgumentException("url == null");
+    com.alibaba.dubbo.common.URL url = arg0;
+    
+    String extName = url.getParameter("client", url.getParameter("transporter", "netty"));
+    
+    if(extName == null) throw new IllegalStateException("Fail to get extension(com.alibaba.dubbo.remoting.Transporter) name from url(" + url.toString() + ") use keys([client, transporter])");
+    
+    com.alibaba.dubbo.remoting.Transporter extension = (com.alibaba.dubbo.remoting.Transporter)ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.remoting.Transporter.class).getExtension(extName);
+    
+    return extension.connect(arg0, arg1);
+}
+}
+```
+
+NettyTransporter的bind方法：
+
+```
+ public Server bind(URL url, ChannelHandler listener) throws RemotingException {
+ 	//创建一个Server
+    return new NettyServer(url, listener);
+}
+```
+
+```
+public NettyServer(URL url, ChannelHandler handler) throws RemotingException{
+	//handler先经过ChannelHandlers的包装方法
+    //然后再初始化
+    super(url, ChannelHandlers.wrap(handler, ExecutorUtil.setThreadName(url, SERVER_THREAD_POOL_NAME)));
+}
+```
+ChannelHandlers.wrap方法中会根据SPI扩展机制动态生成Dispatcher的自适应类，生成的代码不在列出，默认使用AllDispatcher处理，会返回一个AllChannelHandler，会把线程池和DataStore都初始化了。然后经过HeartbeatHandler封装，再经过MultiMessageHandler封装后返回。
+
+NettyServer构造，会依次经过AbstractPeer，AbstractEndpoint，AbstractServer，NettyServer的初始化。重点看下AbstractServer的构造方法：
+
+```
+public AbstractServer(URL url, ChannelHandler handler) throws RemotingException {
+    super(url, handler);
+    localAddress = getUrl().toInetSocketAddress();
+    String host = url.getParameter(Constants.ANYHOST_KEY, false) 
+                    || NetUtils.isInvalidLocalHost(getUrl().getHost()) 
+                    ? NetUtils.ANYHOST : getUrl().getHost();
+    bindAddress = new InetSocketAddress(host, getUrl().getPort());
+    this.accepts = url.getParameter(Constants.ACCEPTS_KEY, Constants.DEFAULT_ACCEPTS);
+    this.idleTimeout = url.getParameter(Constants.IDLE_TIMEOUT_KEY, Constants.DEFAULT_IDLE_TIMEOUT);
+    try {
+        doOpen();
+        if (logger.isInfoEnabled()) {
+            logger.info("Start " + getClass().getSimpleName() + " bind " + getBindAddress() + ", export " + getLocalAddress());
+        }
+    } catch (Throwable t) {
+        throw new RemotingException(url.toInetSocketAddress(), null, "Failed to bind " + getClass().getSimpleName() 
+                                    + " on " + getLocalAddress() + ", cause: " + t.getMessage(), t);
+    }
+    if (handler instanceof WrappedChannelHandler ){
+        executor = ((WrappedChannelHandler)handler).getExecutor();
+    }
+}
+```
+然后调用doOpen方法：
+
+```
+protected void doOpen() throws Throwable {
+    NettyHelper.setNettyLoggerFactory();
+    //boss线程池
+    ExecutorService boss = Executors.newCachedThreadPool(new NamedThreadFactory("NettyServerBoss", true));
+    //worker线程池
+    ExecutorService worker = Executors.newCachedThreadPool(new NamedThreadFactory("NettyServerWorker", true));
+    //ChannelFactory，没有指定工作者线程数量，就使用cpu+1
+    ChannelFactory channelFactory = new NioServerSocketChannelFactory(boss, worker, getUrl().getPositiveParameter(Constants.IO_THREADS_KEY, Constants.DEFAULT_IO_THREADS));
+    bootstrap = new ServerBootstrap(channelFactory);
+
+    final NettyHandler nettyHandler = new NettyHandler(getUrl(), this);
+    channels = nettyHandler.getChannels();
+    // https://issues.jboss.org/browse/NETTY-365
+    // https://issues.jboss.org/browse/NETTY-379
+    // final Timer timer = new HashedWheelTimer(new NamedThreadFactory("NettyIdleTimer", true));
+    bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
+        public ChannelPipeline getPipeline() {
+            NettyCodecAdapter adapter = new NettyCodecAdapter(getCodec() ,getUrl(), NettyServer.this);
+            ChannelPipeline pipeline = Channels.pipeline();
+            /*int idleTimeout = getIdleTimeout();
+            if (idleTimeout > 10000) {
+                pipeline.addLast("timer", new IdleStateHandler(timer, idleTimeout / 1000, 0, 0));
+            }*/
+            pipeline.addLast("decoder", adapter.getDecoder());
+            pipeline.addLast("encoder", adapter.getEncoder());
+            pipeline.addLast("handler", nettyHandler);
+            return pipeline;
+        }
+    });
+    // bind
+    channel = bootstrap.bind(getBindAddress());
+}
+```
+
+doOpen方法创建Netty的Server端并打开。
+
+- NIO框架接受到消息后，先由NettyCodecAdapter解码，再由NettyHandler处理具体的业务逻辑，再由NettyCodecAdapter编码后发送。
+- NettyServer既是Server又是Handler。
+- HeaderExchangerServer只是Server。
+- MultiMessageHandler是多消息处理Handler。
+- HeartbeatHandler是处理心跳事件的Handler。
+- AllChannelHandler是消息派发器，负责将请求放入线程池，并执行请求。
+- DecodeHandler是编解码Handler。
+- HeaderExchangerHandler是信息交换Handler，将请求转化成请求响应模式与同步转异步模式。
+- RequestHandler是最后执行的Handler，会在协议层选择Exporter后选择Invoker，进而执行Filter与Invoker，最终执行请求服务实现类方法。
+- Channel直接触发事件并执行Handler，Channel在有客户端连接Server的时候触发创建并封装成NettyChannel，再由HeaderExchangerHandler创建HeaderExchangerChannel，负责请求响应模式的处理。
+- NettyChannel其实是个Handler，HeaderExchangerChannel是个Channel，
+- 消息的序列化与反序列化工作在NettyCodecAdapter中发起完成。
+
+当有客户端连接Server时的连接过程：
+
+- NettyHandler.connected()
+- NettyServer.connected()
+- MultiMessageHandler.connected()
+- HeartbeatHandler.connected()
+- AllChannelHandler.connected()
+- DecodeHandler.connected()
+- HeaderExchangerHandler.connected()
+- requestHandler.connected()
+- 执行服务的onconnect事件的监听方法
+
+
 
 # 名词解释
 ## Invoker
