@@ -425,10 +425,10 @@ public <T> Exporter<T> export(final Invoker<T> originInvoker) throws RpcExceptio
 ```
 
 #### 交给具体的协议去暴露服务
-先不解析，留在后面，可以先去后面看下导出过程，然后再回来接着看注册到注册中心的过程。
+先不解析，留在后面，可以先去后面看下导出过程，然后再回来接着看注册到注册中心的过程。具体协议暴露服务主要是打开服务器和端口，进行监听。
 
 #### 注册到注册中心
-具体的协议进行暴露并且返回了一个ExporterChangeableWrapper之后，接下来看下一步连接注册中心并注册到注册中中心，代码是在RegistryProtocol的export方法：
+具体的协议进行暴露并且返回了一个ExporterChangeableWrapper之后，接下来看下一步连接注册中心并注册到注册中心，代码是在RegistryProtocol的export方法：
 
 ```
 //此步已经分析完
@@ -450,11 +450,23 @@ getRegistry(originInvoker)方法：
 ```
 //根据invoker的地址获取registry实例
 private Registry getRegistry(final Invoker<?> originInvoker){
+	//获取invoker中的registryUrl
     URL registryUrl = originInvoker.getUrl();
     if (Constants.REGISTRY_PROTOCOL.equals(registryUrl.getProtocol())) {
+    	//获取registry的值，这里获得是zookeeper，默认值是dubbo
         String protocol = registryUrl.getParameter(Constants.REGISTRY_KEY, Constants.DEFAULT_DIRECTORY);
+        //这里获取到的url为：
+        //zookeeper://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?
+        //application=dubbo-provider&application.version=1.0&dubbo=2.5.3&
+        //environment=product&export=dubbo%3A%2F%2F192.168.1.100%3A20880%2F
+        //dubbo.common.hello.service.HelloService%3Fanyhost%3Dtrue%26application%3Ddubbo-provider%26
+        //application.version%3D1.0%26dubbo%3D2.5.3%26environment%3Dproduct%26
+        //interface%3Ddubbo.common.hello.service.HelloService%26methods%3DsayHello%26
+        //organization%3Dchina%26owner%3Dcheng.xi%26pid%3D9457%26side%3Dprovider%26timestamp%3D1489807681627&organization=china&owner=cheng.xi&
+        //pid=9457&timestamp=1489807680193
         registryUrl = registryUrl.setProtocol(protocol).removeParameter(Constants.REGISTRY_KEY);
     }
+    //根据SPI机制获取具体的Registry实例，这里获取到的是ZookeeperRegistry
     return registryFactory.getRegistry(registryUrl);
 }
 ```
@@ -480,26 +492,31 @@ public class RegistryFactory$Adpative implements com.alibaba.dubbo.registry.Regi
 ```
 所以这里registryFactory.getRegistry(registryUrl)用的是ZookeeperRegistryFactory。
 
-先看下getRegistry方法：
+先看下getRegistry方法，会发现该方法会在AbstractRegistryFactory中实现：
 
 ```
 public Registry getRegistry(URL url) {
     url = url.setPath(RegistryService.class.getName())
             .addParameter(Constants.INTERFACE_KEY, RegistryService.class.getName())
             .removeParameters(Constants.EXPORT_KEY, Constants.REFER_KEY);
+    //这里key为：
+    //zookeeper://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService
     String key = url.toServiceString();
     // 锁定注册中心获取过程，保证注册中心单一实例
     LOCK.lock();
     try {
+    	//先从缓存中获取Registry实例
         Registry registry = REGISTRIES.get(key);
         if (registry != null) {
             return registry;
         }
         //创建registry，会直接new一个ZookeeperRegistry返回
+        //具体创建实例是子类来实现的
         registry = createRegistry(url);
         if (registry == null) {
             throw new IllegalStateException("Can not create registry " + url);
         }
+        //放到缓存中
         REGISTRIES.put(key, registry);
         return registry;
     } finally {
@@ -508,7 +525,121 @@ public Registry getRegistry(URL url) {
     }
 }
 ```
-直接前往ZookeeperRegistry中看：
+createRegistry(url);是在子类中实现的，这里是ZookeeperRegistry，首先需要经过AbstractRegistry的构造：
+
+```
+public AbstractRegistry(URL url) {
+	//url保存起来
+    setUrl(url);
+    // 启动文件保存定时器
+    //
+    syncSaveFile = url.getParameter(Constants.REGISTRY_FILESAVE_SYNC_KEY, false);
+    //保存的文件为：
+    ///home/xxx/.dubbo/dubbo-registry-127.0.0.1.cache
+    String filename = url.getParameter(Constants.FILE_KEY, System.getProperty("user.home") + "/.dubbo/dubbo-registry-" + url.getHost() + ".cache");
+    File file = null;
+    if (ConfigUtils.isNotEmpty(filename)) {
+        file = new File(filename);
+        if(! file.exists() && file.getParentFile() != null && ! file.getParentFile().exists()){
+            if(! file.getParentFile().mkdirs()){
+                throw new IllegalArgumentException("Invalid registry store file " + file + ", cause: Failed to create directory " + file.getParentFile() + "!");
+            }
+        }
+    }
+    this.file = file;
+    //加载文件中的属性
+    loadProperties();
+    //通知订阅
+    notify(url.getBackupUrls());
+}
+```
+
+notify()方法：
+
+```
+protected void notify(List<URL> urls) {
+    if(urls == null || urls.isEmpty()) return;
+	//getSubscribed()方法获取订阅者列表
+    //订阅者Entry里每个URL都对应着n个NotifyListener
+    for (Map.Entry<URL, Set<NotifyListener>> entry : getSubscribed().entrySet()) {
+        URL url = entry.getKey();
+
+        if(! UrlUtils.isMatch(url, urls.get(0))) {
+            continue;
+        }
+
+        Set<NotifyListener> listeners = entry.getValue();
+        if (listeners != null) {
+            for (NotifyListener listener : listeners) {
+                try {
+                	//通知每个监听器
+                    notify(url, listener, filterEmpty(url, urls));
+                } catch (Throwable t) {}
+            }
+        }
+    }
+}
+```
+
+`notify(url, listener, filterEmpty(url, urls));`代码：
+
+```
+protected void notify(URL url, NotifyListener listener, List<URL> urls) {
+    Map<String, List<URL>> result = new HashMap<String, List<URL>>();
+    for (URL u : urls) {
+        if (UrlUtils.isMatch(url, u)) {
+        	//分类
+            String category = u.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);
+            List<URL> categoryList = result.get(category);
+            if (categoryList == null) {
+                categoryList = new ArrayList<URL>();
+                result.put(category, categoryList);
+            }
+            categoryList.add(u);
+        }
+    }
+    if (result.size() == 0) {
+        return;
+    }
+    Map<String, List<URL>> categoryNotified = notified.get(url);
+    if (categoryNotified == null) {
+        notified.putIfAbsent(url, new ConcurrentHashMap<String, List<URL>>());
+        categoryNotified = notified.get(url);
+    }
+    for (Map.Entry<String, List<URL>> entry : result.entrySet()) {
+        String category = entry.getKey();
+        List<URL> categoryList = entry.getValue();
+        categoryNotified.put(category, categoryList);
+        //保存到主目录下的.dubbo目录下
+        saveProperties(url);
+        //上面获取到的监听器进行通知
+        listener.notify(categoryList);
+    }
+}
+```
+
+AbstractRegistry构造器初始化完，接着调用FailbackRegistry构造器初始化：
+
+```
+public FailbackRegistry(URL url) {
+    super(url);
+    //重试时间，默认5000ms
+    int retryPeriod = url.getParameter(Constants.REGISTRY_RETRY_PERIOD_KEY, Constants.DEFAULT_REGISTRY_RETRY_PERIOD);
+    //启动失败重试定时器
+    this.retryFuture = retryExecutor.scheduleWithFixedDelay(new Runnable() {
+        public void run() {
+            // 检测并连接注册中心
+            try {
+            	//重试方法由每个具体子类实现
+                //获取到注册失败的，然后尝试注册
+                retry();
+            } catch (Throwable t) { // 防御性容错}
+        }
+    }, retryPeriod, retryPeriod, TimeUnit.MILLISECONDS);
+}
+```
+
+最后回到ZookeeperRegistry的构造初始化：
 
 ```
 public ZookeeperRegistry(URL url, ZookeeperTransporter zookeeperTransporter) {
@@ -516,12 +647,20 @@ public ZookeeperRegistry(URL url, ZookeeperTransporter zookeeperTransporter) {
     if (url.isAnyHost()) {
         throw new IllegalStateException("registry address == null");
     }
+    //获得到注册中心中的分组，默认dubbo
     String group = url.getParameter(Constants.GROUP_KEY, DEFAULT_ROOT);
     if (! group.startsWith(Constants.PATH_SEPARATOR)) {
         group = Constants.PATH_SEPARATOR + group;
     }
+    //注册到注册中心的节点
     this.root = group;
+    //使用zookeeperTansporter去连接
+    //ZookeeperTransport这里是生成的自适应实现，默认使用ZkClientZookeeperTransporter
+    //ZkClientZookeeperTransporter的connect去实例化一个ZkClient实例
+    //并且订阅状态变化的监听器subscribeStateChanges
+    //然后返回一个ZkClientZookeeperClient实例
     zkClient = zookeeperTransporter.connect(url);
+    //ZkClientZookeeperClient添加状态改变监听器
     zkClient.addStateListener(new StateListener() {
         public void stateChanged(int state) {
             if (state == RECONNECTED) {
@@ -535,33 +674,93 @@ public ZookeeperRegistry(URL url, ZookeeperTransporter zookeeperTransporter) {
     });
 }
 ```
-zookeeperTransport也是生成的代码，默认是zkClient的实现：
+
+获取到了Registry，Registry实例中保存着连接到了zookeeper的zkClient实例之后，下一步获取要注册到注册中心的url（在RegistryProtocol中）。
 
 ```
-import com.alibaba.dubbo.common.extension.ExtensionLoader;
-public class ZookeeperTransporter$Adpative implements com.alibaba.dubbo.remoting.zookeeper.ZookeeperTransporter {
-    public com.alibaba.dubbo.remoting.zookeeper.ZookeeperClient connect(com.alibaba.dubbo.common.URL arg0) {
-        if (arg0 == null) throw new IllegalArgumentException("url == null");
-        
-        com.alibaba.dubbo.common.URL url = arg0;
-        String extName = url.getParameter("client", url.getParameter("transporter", "zkclient"));
-        
-        if(extName == null) throw new IllegalStateException("Fail to get extension(com.alibaba.dubbo.remoting.zookeeper.ZookeeperTransporter) name from url(" + url.toString() + ") use keys([client, transporter])");
-        
-        com.alibaba.dubbo.remoting.zookeeper.ZookeeperTransporter extension = (com.alibaba.dubbo.remoting.zookeeper.ZookeeperTransporter)ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.remoting.zookeeper.ZookeeperTransporter.class).getExtension(extName);
-        
-        return extension.connect(arg0);
+final URL registedProviderUrl = getRegistedProviderUrl(originInvoker);
+//得到的URL是：
+//dubbo://192.168.1.100:20880/dubbo.common.hello.service.HelloService?
+//anyhost=true&application=dubbo-provider&application.version=1.0&dubbo=2.5.3&environment=product&
+//interface=dubbo.common.hello.service.HelloService&methods=sayHello&
+//organization=china&owner=cheng.xi&pid=9457&side=provider&timestamp=1489807681627
+```
+
+然后调用`registry.register(registedProviderUrl)`注册到注册中心（在RegistryProtocol中）。register方法的实现在FailbackRegistry中：
+
+```
+public void register(URL url) {
+    super.register(url);
+    failedRegistered.remove(url);
+    failedUnregistered.remove(url);
+    try {
+        // 向服务器端发送注册请求
+        //调用子类具体实现，发送注册请求
+        doRegister(url);
+    } catch (Exception e) {
+        Throwable t = e;
+
+        // 如果开启了启动时检测，则直接抛出异常
+        boolean check = getUrl().getParameter(Constants.CHECK_KEY, true)
+                && url.getParameter(Constants.CHECK_KEY, true)
+                && ! Constants.CONSUMER_PROTOCOL.equals(url.getProtocol());
+        boolean skipFailback = t instanceof SkipFailbackWrapperException;
+        if (check || skipFailback) {
+            if(skipFailback) {
+                t = t.getCause();
+            }
+            throw  。。。
+        } else { }
+
+        // 将失败的注册请求记录到失败列表，定时重试
+        failedRegistered.add(url);
     }
 }
 ```
+`doRegister(url);`在这里是ZookeeperRegistry中具体实现的，这里将会注册到注册中心：
 
-所以zookeeperTransporter.connect(url)就是调用的ZookeeperClient的connect方法。直接返回一个ZkclientZookeeperClient实例。最后添加zkClient的监听。
+```
+protected void doRegister(URL url) {
+    try {
+    	//这里zkClient就是我们上面调用构造的时候生成的
+        //ZkClientZookeeperClient
+        //保存着连接到Zookeeper的zkClient实例
+        //开始注册，也就是在Zookeeper中创建节点
+        //这里toUrlPath获取到的path为：
+        ///dubbo/dubbo.common.hello.service.HelloService/providers/dubbo%3A%2F%2F192.168.1.100%3A20880%2F
+        //dubbo.common.hello.service.HelloService%3Fanyhost%3Dtrue%26application%3Ddubbo-provider%26
+        //application.version%3D1.0%26dubbo%3D2.5.3%26environment%3Dproduct%26interface%3D
+        //dubbo.common.hello.service.HelloService%26methods%3DsayHello%26
+        //organization%3Dchina%26owner%3Dcheng.xi%26pid%3D8920%26side%3Dprovider%26timestamp%3D1489828029449
+        //默认创建的节点是临时节点
+        zkClient.create(toUrlPath(url), url.getParameter(Constants.DYNAMIC_KEY, true));
+    } catch (Throwable e) { }
+}
+```
+经过这一步之后，Zookeeper中就有节点存在了，具体节点为：
 
-获取到了Registry实例之后，下一步获取要注册到注册中心的url。然后调用registry.register(registedProviderUrl)注册到注册中心。具体的调用暂先不解析。最后注册一个订阅覆盖配置的监听器，返回Exporter。
+```
+/dubbo
+	dubbo.common.hello.service.HelloService
+    	providers
+        	/dubbo/dubbo.common.hello.service.HelloService/providers/
+            dubbo%3A%2F%2F192.168.1.100%3A20880%2Fdubbo.common.hello.service.HelloService%3F
+            anyhost%3Dtrue%26application%3Ddubbo-provider%26
+            application.version%3D1.0%26dubbo%3D2.5.3%26environment%3Dproduct%26
+            interface%3Ddubbo.common.hello.service.HelloService%26methods%3DsayHello%26
+            organization%3Dchina%26owner%3Dcheng.xi%26pid%3D13239%26side%3D
+            provider%26timestamp%3D1489829293525
+```
+
+### 订阅注册中心的服务
+在注册到注册中心之后，registry会去订阅覆盖配置的服务，这一步之后就会在`/dubbo/dubbo.common.hello.service/HelloService`节点下多一个configurators节点。（具体过程暂先不解析）。
+
+### 返回新Exporter实例
+最后返回Exporter新实例，返回到ServiceConfig中。服务的发布就算完成了。
 
 
 ### 交给具体的协议进行服务暴露
-这里也就是非Registry类型的Invoker的导出过程。
+这里也就是非Registry类型的Invoker的导出过程。主要的步骤是将本地ip和20880端口打开，进行监听。最后包装成exporter返回。
 
 doLocalExport(invoker)：
 
@@ -824,6 +1023,8 @@ public ExchangeServer bind(URL url, ExchangeHandler handler) throws RemotingExce
 ```
 这里会先创建一个HeaderExchangerHandler，包含着ExchangeHandlerAdapter，接着创建一个DecodeHandler，会包含前面的handler，接下来调用Transporters的bind方法，返回一个Server，接着用HeaderExchangeServer包装一下，就返回给Protocol层了。
 
+在HeaderExchangerServer包装的时候会启动心跳定时器`startHeatbeatTimer();`，暂不解析。
+
 Transports的bind方法：
 
 ```
@@ -904,14 +1105,10 @@ public AbstractServer(URL url, ChannelHandler handler) throws RemotingException 
     this.accepts = url.getParameter(Constants.ACCEPTS_KEY, Constants.DEFAULT_ACCEPTS);
     this.idleTimeout = url.getParameter(Constants.IDLE_TIMEOUT_KEY, Constants.DEFAULT_IDLE_TIMEOUT);
     try {
+    	//初始化的时候会打开Server
+        //具体实现这里是NettyServer中
         doOpen();
-        if (logger.isInfoEnabled()) {
-            logger.info("Start " + getClass().getSimpleName() + " bind " + getBindAddress() + ", export " + getLocalAddress());
-        }
-    } catch (Throwable t) {
-        throw new RemotingException(url.toInetSocketAddress(), null, "Failed to bind " + getClass().getSimpleName() 
-                                    + " on " + getLocalAddress() + ", cause: " + t.getMessage(), t);
-    }
+    } catch (Throwable t) { }
     if (handler instanceof WrappedChannelHandler ){
         executor = ((WrappedChannelHandler)handler).getExecutor();
     }
@@ -932,29 +1129,22 @@ protected void doOpen() throws Throwable {
 
     final NettyHandler nettyHandler = new NettyHandler(getUrl(), this);
     channels = nettyHandler.getChannels();
-    // https://issues.jboss.org/browse/NETTY-365
-    // https://issues.jboss.org/browse/NETTY-379
-    // final Timer timer = new HashedWheelTimer(new NamedThreadFactory("NettyIdleTimer", true));
     bootstrap.setPipelineFactory(new ChannelPipelineFactory() {
         public ChannelPipeline getPipeline() {
             NettyCodecAdapter adapter = new NettyCodecAdapter(getCodec() ,getUrl(), NettyServer.this);
             ChannelPipeline pipeline = Channels.pipeline();
-            /*int idleTimeout = getIdleTimeout();
-            if (idleTimeout > 10000) {
-                pipeline.addLast("timer", new IdleStateHandler(timer, idleTimeout / 1000, 0, 0));
-            }*/
             pipeline.addLast("decoder", adapter.getDecoder());
             pipeline.addLast("encoder", adapter.getEncoder());
             pipeline.addLast("handler", nettyHandler);
             return pipeline;
         }
     });
-    // bind
+    // bind之后返回一个Channel
     channel = bootstrap.bind(getBindAddress());
 }
 ```
 
-doOpen方法创建Netty的Server端并打开。
+doOpen方法创建Netty的Server端并打开，具体的事情就交给Netty去处理了，Netty的过程，原理，代码有时间再另行研究。
 
 - NIO框架接受到消息后，先由NettyCodecAdapter解码，再由NettyHandler处理具体的业务逻辑，再由NettyCodecAdapter编码后发送。
 - NettyServer既是Server又是Handler。
