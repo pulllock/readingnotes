@@ -1,4 +1,4 @@
-Dubbo中编解码的工作由Codec2接口的实现来处理，回想一下第一次接触到Codec2相关的内容是在服务端暴露服务的时候，根据具体的协议去暴露服务的步骤中，在DubboProtocol的createServer方法中：
+（这里做的解析不是很详细，等到走完整个流程再来解析）Dubbo中编解码的工作由Codec2接口的实现来处理，回想一下第一次接触到Codec2相关的内容是在服务端暴露服务的时候，根据具体的协议去暴露服务的步骤中，在DubboProtocol的createServer方法中：
 
 ```
 private ExchangeServer createServer(URL url) {
@@ -256,22 +256,25 @@ public void messageReceived(ChannelHandlerContext ctx, MessageEvent event) throw
 
     NettyChannel channel = NettyChannel.getOrAddChannel(ctx.getChannel(), url, handler);
     Object msg;
+    //读索引
     int saveReaderIndex;
-
     try {
-        // decode object.
         do {
             saveReaderIndex = message.readerIndex();
             try {
+            //解码
                 msg = codec.decode(channel, message);
             } catch (IOException e) {
                 buffer = com.alibaba.dubbo.remoting.buffer.ChannelBuffers.EMPTY_BUFFER;
                 throw e;
             }
+            //不完整的协议包
             if (msg == Codec2.DecodeResult.NEED_MORE_INPUT) {
+            	//重置读索引
                 message.readerIndex(saveReaderIndex);
+                //跳出循环，之后在finally中把message赋值给buffer保存起来，等到下次接收到数据包的时候会追加到buffer的后面
                 break;
-            } else {
+            } else {//有多个协议包，触发messageReceived事件
                 if (saveReaderIndex == message.readerIndex()) {
                     buffer = com.alibaba.dubbo.remoting.buffer.ChannelBuffers.EMPTY_BUFFER;
                     throw new IOException("Decode without read data.");
@@ -293,7 +296,7 @@ public void messageReceived(ChannelHandlerContext ctx, MessageEvent event) throw
 }
 ```
 
-DubboCountCodec的decode方法：
+继续看`codec.decode(channel, message);`这里是DubboCountCodec的decode方法：
 
 ```
 public Object decode(Channel channel, ChannelBuffer buffer) throws IOException {
@@ -323,6 +326,148 @@ public Object decode(Channel channel, ChannelBuffer buffer) throws IOException {
     return result;
 }
 ```
+
+继续看ExchangeCodec的decode方法：
+
+```
+public Object decode(Channel channel, ChannelBuffer buffer) throws IOException {
+	//可读字节数
+    int readable = buffer.readableBytes();
+    byte[] header = new byte[Math.min(readable, HEADER_LENGTH)];
+    //协议头
+    buffer.readBytes(header);
+    //解码
+    return decode(channel, buffer, readable, header);
+}
+```
+
+解码decode：
+
+```
+protected Object decode(Channel channel, ChannelBuffer buffer, int readable, byte[] header) throws IOException {
+    //检查魔数.
+    if (readable > 0 && header[0] != MAGIC_HIGH 
+            || readable > 1 && header[1] != MAGIC_LOW) {
+        int length = header.length;
+        if (header.length < readable) {
+            header = Bytes.copyOf(header, readable);
+            buffer.readBytes(header, length, readable - length);
+        }
+        for (int i = 1; i < header.length - 1; i ++) {
+            if (header[i] == MAGIC_HIGH && header[i + 1] == MAGIC_LOW) {
+                buffer.readerIndex(buffer.readerIndex() - header.length + i);
+                header = Bytes.copyOf(header, i);
+                break;
+            }
+        }
+        //telenet
+        return super.decode(channel, buffer, readable, header);
+    }
+    //不完整的包
+    if (readable < HEADER_LENGTH) {
+        return DecodeResult.NEED_MORE_INPUT;
+    }
+
+    //数据长度
+    int len = Bytes.bytes2int(header, 12);
+    checkPayload(channel, len);
+
+    int tt = len + HEADER_LENGTH;
+    if( readable < tt ) {
+        return DecodeResult.NEED_MORE_INPUT;
+    }
+
+    // limit input stream.
+    ChannelBufferInputStream is = new ChannelBufferInputStream(buffer, len);
+
+    try {
+    	//解码数据
+        return decodeBody(channel, is, header);
+    } finally {
+        if (is.available() > 0) {
+            try {
+                StreamUtils.skipUnusedStream(is);
+            } catch (IOException e) { }
+        }
+    }
+}
+```
+
+decodeBody解析数据部分：
+
+```
+protected Object decodeBody(Channel channel, InputStream is, byte[] header) throws IOException {
+    byte flag = header[2], proto = (byte) (flag & SERIALIZATION_MASK);
+    //获取序列化方式
+    Serialization s = CodecSupport.getSerialization(channel.getUrl(), proto);
+    //反序列化
+    ObjectInput in = s.deserialize(channel.getUrl(), is);
+    //获取请求id
+    long id = Bytes.bytes2long(header, 4);
+    //这里是解码响应数据
+    if ((flag & FLAG_REQUEST) == 0) {
+        //response的id设为来时候的Request的id，这样才能对上暗号
+        Response res = new Response(id);
+        //判断是什么类型请求
+        if ((flag & FLAG_EVENT) != 0) {
+            res.setEvent(Response.HEARTBEAT_EVENT);
+        }
+        //获取状态
+        byte status = header[3];
+        res.setStatus(status);
+        if (status == Response.OK) {
+            try {
+                Object data;
+                if (res.isHeartbeat()) {
+                	//解码心跳数据
+                    data = decodeHeartbeatData(channel, in);
+                } else if (res.isEvent()) {
+                	//事件
+                    data = decodeEventData(channel, in);
+                } else {
+                	//响应
+                    data = decodeResponseData(channel, in, getRequestData(id));
+                }
+                res.setResult(data);
+            } catch (Throwable t) {
+                res.setStatus(Response.CLIENT_ERROR);
+                res.setErrorMessage(StringUtils.toString(t));
+            }
+        } else {
+            res.setErrorMessage(in.readUTF());
+        }
+        return res;
+    } else {//这是解码请求数据
+        // request的id
+        Request req = new Request(id);
+        req.setVersion("2.0.0");
+        req.setTwoWay((flag & FLAG_TWOWAY) != 0);
+        if ((flag & FLAG_EVENT) != 0) {
+            req.setEvent(Request.HEARTBEAT_EVENT);
+        }
+        try {
+            Object data;
+            if (req.isHeartbeat()) {
+            	//心跳
+                data = decodeHeartbeatData(channel, in);
+            } else if (req.isEvent()) {
+            	//事件
+                data = decodeEventData(channel, in);
+            } else {
+            	//请求
+                data = decodeRequestData(channel, in);
+            }
+            req.setData(data);
+        } catch (Throwable t) {
+            // bad request
+            req.setBroken(true);
+            req.setData(t);
+        }
+        return req;
+    }
+}
+```
+具体的解码细节交给底层解码器，这里是使用的hessian2。
 
 ### 服务消费者对响应消息的解码
 暂先不做解释。
