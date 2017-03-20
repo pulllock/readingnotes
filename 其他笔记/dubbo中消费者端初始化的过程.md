@@ -7,6 +7,8 @@
 - reference标签中没有配置init属性，此时是延迟初始化的，也就是只有等到bean引用被注入到其他Bean中，或者调用getBean获取这个Bean的时候，才会初始化。比如在这里的例子里reference没有配置init属性，只有等到`HelloService helloService = (HelloService) applicationContext.getBean("helloService");`这句getBean的时候，才会开始调用init方法进行初始化。
 - 另外一种情况是立即初始化，即是如果reference标签中init属性配置为true，会立即进行初始化（也就是上面说到的实现了FactoryBean接口）。
 
+## 初始化开始
+
 这里以没有配置init的reference为例，只要不注入bean或者不调用getBean获取bean的时候，就不会被初始化。`HelloService helloService = (HelloService) applicationContext.getBean("helloService");`
 
 另外在ReferenceBean这个类在Spring中初始化的时候，有几个静态变量会被初始化：
@@ -117,6 +119,8 @@ public class ProxyFactory$Adpative implements com.alibaba.dubbo.rpc.ProxyFactory
 }
 ```
 
+### 初始化入口
+
 初始化的入口在ReferenceConfig的get()方法：
 
 ```
@@ -130,7 +134,7 @@ public synchronized T get() {
   return ref;
 }
 ```
-init()方法会先初始化所有的配置信息，然后调用`ref = createProxy(map);`。消费者最终得到的是服务的代理。初始化主要做的事情就是引用对应的远程服务，大概的步骤：
+init()方法会先检查初始化所有的配置信息，然后调用`ref = createProxy(map);`创建代理，消费者最终得到的是服务的代理。初始化主要做的事情就是引用对应的远程服务，大概的步骤：
 
 - 监听注册中心
 - 连接服务提供者端进行服务引用
@@ -141,6 +145,11 @@ init()方法会先初始化所有的配置信息，然后调用`ref = createProx
 > 订阅/dubbo/com.foo.BarService/providers目录下的提供者URL地址。
 > 并向/dubbo/com.foo.BarService/consumers目录下写入自己的URL地址。
 
+### createProxy方法
+
+- 引用远程服务
+- 创建代理
+
 init()中createProxy方法：
 
 ```
@@ -149,9 +158,13 @@ private T createProxy(Map<String, String> map) {
     //判断是否是点对点直连
     //判断是否是通过注册中心连接
     //然后是服务的引用
-    //这里url为registry://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?application=dubbo-consumer&dubbo=2.5.3&pid=12272&
-    //refer=application%3Ddubbo-consumer%26dubbo%3D2.5.3%26interface%3Ddubbo.common.hello.service.HelloService%26
-    //methods%3DsayHello%26pid%3D12272%26side%3Dconsumer%26timeout%3D100000%26timestamp%3D1489318676447&
+    //这里url为
+    //registry://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?
+    //application=dubbo-consumer&dubbo=2.5.3&pid=12272&
+    //refer=application%3Ddubbo-consumer%26dubbo%3D2.5.3%26
+    //interface%3Ddubbo.common.hello.service.HelloService%26
+    //methods%3DsayHello%26pid%3D12272%26side%3D
+    //consumer%26timeout%3D100000%26timestamp%3D1489318676447&
     //registry=zookeeper&timestamp=1489318676641
     //引用远程服务由Protocol的实现来处理
     refprotocol.refer(interfaceClass, url);
@@ -161,13 +174,19 @@ private T createProxy(Map<String, String> map) {
 ```
 这里refprotocol是上面生成的代码，会根据协议不同选择不同的Protocol协议。
 
+#### 引用远程服务
+
 对于服务引用`refprotocol.refer(interfaceClass, url)`会首先进入ProtocolListenerWrapper的refer方法，然后在进入ProtocolFilterWrapper的refer方法，然后再进入RegistryProtocol的refer方法，这里的url协议是registry，所以上面两个Wrapper中不做处理，直接进入了RegistryProtocol，看下RegistryProtocol中：
 
 ```
 public <T> Invoker<T> refer(Class<T> type, URL url) throws RpcException {
-	//这里获得的url是zookeeper://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?application=dubbo-consumer&dubbo=2.5.3&pid=12272&
-    //refer=application%3Ddubbo-consumer%26dubbo%3D2.5.3%26interface%3Ddubbo.common.hello.service.HelloService%26
-    //methods%3DsayHello%26pid%3D12272%26side%3Dconsumer%26timeout%3D100000%26
+	//这里获得的url是
+    //zookeeper://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?
+    //application=dubbo-consumer&dubbo=2.5.3&pid=12272&
+    //refer=application%3Ddubbo-consumer%26dubbo%3D2.5.3%26
+    //interface%3Ddubbo.common.hello.service.HelloService%26
+    //methods%3DsayHello%26pid%3D12272%26side%3D
+    //consumer%26timeout%3D100000%26
     //timestamp%3D1489318676447&timestamp=1489318676641
     url = url.setProtocol(url.getParameter(Constants.REGISTRY_KEY, Constants.DEFAULT_REGISTRY)).removeParameter(Constants.REGISTRY_KEY);
     //根据url获取Registry对象
@@ -196,16 +215,22 @@ public <T> Invoker<T> refer(Class<T> type, URL url) throws RpcException {
 }
 ```
 
-连接注册中心`Registry registry = registryFactory.getRegistry(url);`：
+##### 获取注册中心
+
+连接注册中心`Registry registry = registryFactory.getRegistry(url);`首先会到AbstractRegistryFactory的getRegistry方法：
 
 ```
 public Registry getRegistry(URL url) {
-	//这里url是zookeeper://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?application=dubbo-consumer&dubbo=2.5.3&
-    //interface=com.alibaba.dubbo.registry.RegistryService&pid=12272&timestamp=1489318676641
+	//这里url是
+    //zookeeper://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService?
+    //application=dubbo-consumer&dubbo=2.5.3&
+    //interface=com.alibaba.dubbo.registry.RegistryService&
+    //pid=12272&timestamp=1489318676641
     url = url.setPath(RegistryService.class.getName())
             .addParameter(Constants.INTERFACE_KEY, RegistryService.class.getName())
             .removeParameters(Constants.EXPORT_KEY, Constants.REFER_KEY);
-    //这里key是zookeeper://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService
+    //这里key是
+    //zookeeper://127.0.0.1:2181/com.alibaba.dubbo.registry.RegistryService
     String key = url.toServiceString();
     // 锁定注册中心获取过程，保证注册中心单一实例
     LOCK.lock();
@@ -271,11 +296,12 @@ public ZookeeperRegistry(URL url, ZookeeperTransporter zookeeperTransporter) {
     if (url.isAnyHost()) {
         throw new IllegalStateException("registry address == null");
     }
-    //服务分组
+    //服务分组，默认dubbo
     String group = url.getParameter(Constants.GROUP_KEY, DEFAULT_ROOT);
     if (! group.startsWith(Constants.PATH_SEPARATOR)) {
         group = Constants.PATH_SEPARATOR + group;
     }
+    //注册中心的节点
     this.root = group;
     //ZkclientZookeeperTransporter的connect方法
     //直接返回一个ZkclientZookeeperClient实例
@@ -319,31 +345,95 @@ public AbstractRegistry(URL url) {
     //缓存文件存在的话就把文件读进内存中
     loadProperties();
     //先获取backup url
-    //然后notify（暂没理解）
+    //然后通知订阅
     notify(url.getBackupUrls());
 }
 ```
 
-接着是FailbackRegistry的处理：
+notify方法：
+
+```
+protected void notify(List<URL> urls) {
+    if(urls == null || urls.isEmpty()) return;
+	//getSubscribed()方法获取订阅者列表
+    for (Map.Entry<URL, Set<NotifyListener>> entry : getSubscribed().entrySet()) {
+        URL url = entry.getKey();
+
+        if(! UrlUtils.isMatch(url, urls.get(0))) {
+            continue;
+        }
+
+        Set<NotifyListener> listeners = entry.getValue();
+        if (listeners != null) {
+            for (NotifyListener listener : listeners) {
+                try {
+                	//通知每个监听器
+                    notify(url, listener, filterEmpty(url, urls));
+                } catch (Throwable t) { }
+            }
+        }
+    }
+}
+```
+
+`notify(url, listener, filterEmpty(url, urls));`代码：
+
+```
+protected void notify(URL url, NotifyListener listener, List<URL> urls) {
+    Map<String, List<URL>> result = new HashMap<String, List<URL>>();
+    for (URL u : urls) {
+        if (UrlUtils.isMatch(url, u)) {
+        	//分类
+            String category = u.getParameter(Constants.CATEGORY_KEY, Constants.DEFAULT_CATEGORY);
+            List<URL> categoryList = result.get(category);
+            if (categoryList == null) {
+                categoryList = new ArrayList<URL>();
+                result.put(category, categoryList);
+            }
+            categoryList.add(u);
+        }
+    }
+    if (result.size() == 0) {
+        return;
+    }
+    Map<String, List<URL>> categoryNotified = notified.get(url);
+    if (categoryNotified == null) {
+        notified.putIfAbsent(url, new ConcurrentHashMap<String, List<URL>>());
+        categoryNotified = notified.get(url);
+    }
+    for (Map.Entry<String, List<URL>> entry : result.entrySet()) {
+        String category = entry.getKey();
+        List<URL> categoryList = entry.getValue();
+        categoryNotified.put(category, categoryList);
+        saveProperties(url);
+        //通知
+        listener.notify(categoryList);
+    }
+}
+```
+
+AbstractRegistry构造完，接着是FailbackRegistry的处理：
 
 ```
 public FailbackRegistry(URL url) {
     super(url);
     int retryPeriod = url.getParameter(Constants.REGISTRY_RETRY_PERIOD_KEY, Constants.DEFAULT_REGISTRY_RETRY_PERIOD);
+    //启动失败重试定时器
     this.retryFuture = retryExecutor.scheduleWithFixedDelay(new Runnable() {
         public void run() {
             // 检测并连接注册中心
             try {
+            	//重试方法由每个具体子类实现
+                //获取到注册失败的，然后尝试注册
                 retry();
-            } catch (Throwable t) { // 防御性容错
-                logger.error("Unexpected error occur at failed retry, cause: " + t.getMessage(), t);
-            }
+            } catch (Throwable t) { // 防御性容错 }
         }
     }, retryPeriod, retryPeriod, TimeUnit.MILLISECONDS);
 }
 ```
-这里会启动一个新的定时线程，主要是有连接失败的话，会进行重试连接retry();，启动完之后返回ZookeeperRegistry中继续处理。
+这里会启动一个新的定时线程，主要是有连接失败的话，会进行重试连接retry();，启动完之后返回ZookeeperRegistry中继续处理。接下来的处理在代码注释中，不再详细写，看下一步服务的引用。
 
+##### 引用远程服务
 
 继续看ref方法中最后一步，服务的引用，返回的是一个Invoker，`return doRefer(cluster, registry, type, url)；`
 
@@ -357,8 +447,11 @@ private <T> Invoker<T> doRefer(Cluster cluster, Registry registry, Class<T> type
     RegistryDirectory<T> directory = new RegistryDirectory<T>(type, url);
     directory.setRegistry(registry);
     directory.setProtocol(protocol);
-    //此处的subscribeUrl为consumer://192.168.1.100/dubbo.common.hello.service.HelloService?application=dubbo-consumer&dubbo=2.5.3&
-    //interface=dubbo.common.hello.service.HelloService&methods=sayHello&pid=16409&
+    //此处的subscribeUrl为
+    //consumer://192.168.1.100/dubbo.common.hello.service.HelloService?
+    //application=dubbo-consumer&dubbo=2.5.3&
+    //interface=dubbo.common.hello.service.HelloService&
+    //methods=sayHello&pid=16409&
     //side=consumer&timeout=100000&timestamp=1489322133987
     URL subscribeUrl = new URL(Constants.CONSUMER_PROTOCOL, NetUtils.getLocalHost(), 0, type.getName(), directory.getUrl().getParameters());
     if (! Constants.ANY_VALUE.equals(url.getServiceInterface())
