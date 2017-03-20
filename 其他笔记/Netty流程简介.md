@@ -25,8 +25,8 @@ Reactor模式中使用Handle来表示打开的连接，也就是事件源，在j
 ## ChannelHandler
 作用就是Reactor模式中的EventHandler，用来处理事件请求。有两个子接口：
 
-- ChannelDownstreamHandler，处理从用户应用流向Netty内部，然后流向Socket的事件。
-- ChannelUpstreamHandler，处理从Socket进入Netty内部，然后流向用户应用的事件。
+- ChannelDownstreamHandler，处理从Netty内部流向Socket的事件。
+- ChannelUpstreamHandler，处理从Socket进入Netty内部的事件。
 
 ## ChannelPipeline
 每个Channel都会有一个ChannelPipeline，用来管理ChannelHandler。ChannelPipeline内部有一个ChannelHandler的双向链表，以Upstream为正方向，Downstream为负方向。
@@ -109,5 +109,12 @@ ChannelPipelineFactory主要是用于具体传输数据的处理，是我们自�
 - 使用ChannelFactory来初始化一个ServerBootstrap实例。
 - 为ServerBootstrap设置pipelineFactory，这里用来添加各种处理用的Handler。
 - 使用Bind方法绑定并监听。
+
+
+# Handler处理顺序
+Handler跟Servlet中的Filter类似，在Netty中，Handler存在于Pipeline中，是一个链状的。
+
+在Netty中存在两种ChannelHandler，一种是ChannelDownstreamHandler，另外一种是ChannelUpstreamHandler，从Socket流向Netty内部的数据经过ChannelUpstreamHandler处理，而从Netty内部流向Socket的数据由ChannelDownstreamHandler处理。
+
 
 有关具体的分析和源码分析，等到dubbo分析完成之后，再做。
