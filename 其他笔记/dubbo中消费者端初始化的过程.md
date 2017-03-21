@@ -481,8 +481,11 @@ AbstractRegistry的register方法：
 
 ```
 public void register(URL url) {
-	//此时url是consumer://192.168.1.100/dubbo.common.hello.service.HelloService?application=dubbo-consumer&
-    //category=consumers&check=false&dubbo=2.5.3&interface=dubbo.common.hello.service.HelloService&methods=sayHello
+	//此时url是
+    //consumer://192.168.1.100/dubbo.common.hello.service.HelloService?
+    //application=dubbo-consumer&
+    //category=consumers&check=false&dubbo=2.5.3&
+    //interface=dubbo.common.hello.service.HelloService&methods=sayHello
     //&pid=16409&side=consumer&timeout=100000&timestamp=1489322133987
     if (url == null) {
         throw new IllegalArgumentException("register url == null");
@@ -545,9 +548,14 @@ protected void doRegister(URL url) {
 zkClient.create()方法：
 
 ```
-//path为/dubbo/dubbo.common.hello.service.HelloService/consumers/consumer%3A%2F%2F192.168.1.100%2F
-//dubbo.common.hello.service.HelloService%3Fapplication%3Ddubbo-consumer%26category%3Dconsumers%26check%3Dfalse%26dubbo%3D2.5.3%26interface%3D
-//dubbo.common.hello.service.HelloService%26methods%3DsayHello%26pid%3D28819%26
+//path为
+///dubbo/dubbo.common.hello.service.HelloService/consumers/
+//consumer%3A%2F%2F192.168.1.100%2F
+//dubbo.common.hello.service.HelloService%3Fapplication%3D
+//dubbo-consumer%26category%3Dconsumers%26check%3Dfalse%26
+//dubbo%3D2.5.3%26interface%3D
+//dubbo.common.hello.service.HelloService%26
+//methods%3DsayHello%26pid%3D28819%26
 //side%3Dconsumer%26timeout%3D100000%26timestamp%3D1489332839677
 public void create(String path, boolean ephemeral) {
     int i = path.lastIndexOf('/');
@@ -561,13 +569,34 @@ public void create(String path, boolean ephemeral) {
         createEphemeral(path);
     } else {
     	//创建持久的节点，/dubbo/dubbo.common.hello.service.HelloService/consumers/
-        //consumer%3A%2F%2F192.168.110.197%2Fdubbo.common.hello.service.HelloService%3Fapplication%3Ddubbo-consumer%26
-        //category%3Dconsumers%26check%3Dfalse%26dubbo%3D2.5.3%26interface%3D
-        //dubbo.common.hello.service.HelloService%26methods%3DsayHello%26pid%3D6370%26side%3D
+        //consumer%3A%2F%2F192.168.110.197%2F
+        //dubbo.common.hello.service.HelloService%3Fapplication%3Ddubbo-consumer%26
+        //category%3Dconsumers%26check%3Dfalse%26
+        //dubbo%3D2.5.3%26interface%3D
+        //dubbo.common.hello.service.HelloService%26
+        //methods%3DsayHello%26pid%3D6370%26side%3D
         //consumer%26timeout%3D100000%26timestamp%3D1489367959659
         createPersistent(path);
     }
 }
+```
+
+经过上面create之后，Zookeeper中就存在了消费者需要订阅的服务的节点：
+
+```
+/dubbo
+	/dubbo.common.hello.service.HelloService
+    	/consumers
+        	/http://0.0.0.0:4550/?path=dubbo%2F
+            dubbo.common.hello.service.HelloService%2F
+            consumers%2Fconsumer%253A%252F%252F192.168.110.197%252F
+            dubbo.common.hello.service.HelloService%253F
+            application%253Ddubbo-consumer%2526category%253D
+            consumers%2526check%253Dfalse%2526
+            dubbo%253D2.5.3%2526interface%253D
+            dubbo.common.hello.service.HelloService%2526
+            methods%253DsayHello%2526pid%253D22392%2526side%253D
+            consumer%2526timeout%253D100000%2526timestamp%253D1490063394184
 ```
 
 消费者自己注册到注册中心之后，接着是订阅服务提供者，directory.subscribe()：
@@ -997,7 +1026,7 @@ Transporters.connect中也是根据SPI扩展获取Transport的具体实现，这
 ```
 public AbstractEndpoint(URL url, ChannelHandler handler) {
     super(url, handler);
-    //这里是DubboCodec
+    //获取编解码器，这里是DubboCountCodec
     this.codec = getChannelCodec(url);
     this.timeout = url.getPositiveParameter(Constants.TIMEOUT_KEY, Constants.DEFAULT_TIMEOUT);
     this.connectTimeout = url.getPositiveParameter(Constants.CONNECT_TIMEOUT_KEY, Constants.DEFAULT_CONNECT_TIMEOUT);
@@ -1119,7 +1148,7 @@ protected void doConnect() throws Throwable {
 ```
 这里连接的细节都交给了netty。
 
-NettyClient初始化完成之后，返回给Transporters，再返回给HeaderExchanger，HeaderExchanger中将NettyClient包装成HeaderExchangeClient返回给DubboProtocol的initClient方法中，到此在getSharedClient中就获取到了一个ExchangeClient。
+NettyClient初始化完成之后，返回给Transporters，再返回给HeaderExchanger，HeaderExchanger中将NettyClient包装成HeaderExchangeClient返回给DubboProtocol的initClient方法中，到此在getSharedClient中就获取到了一个ExchangeClient，然后包装一下返回`client = new ReferenceCountExchangeClient(exchagneclient, ghostClientMap);`。
 
 到这里在DubboProtocol的refer方法中这句`DubboInvoker<T> invoker = new DubboInvoker<T>(serviceType, url, getClients(url), invokers);`创建DubboInvoker就已经解析完成，创建过程中连接了服务端，包含一个ExchangeClient等：
 
@@ -1134,9 +1163,36 @@ public <T> Invoker<T> refer(Class<T> serviceType, URL url) throws RpcException {
 }
 ```
 
+接着返回ProtocolFilterWrapper的refer方法，在这里会构建invoker链：
+
+```
+public <T> Invoker<T> refer(Class<T> type, URL url) throws RpcException {
+    if (Constants.REGISTRY_PROTOCOL.equals(url.getProtocol())) {
+        return protocol.refer(type, url);
+    }
+    return buildInvokerChain(protocol.refer(type, url), Constants.REFERENCE_FILTER_KEY, Constants.CONSUMER);
+}
+```
+
+接着再返回到ProtocolListenerWrapper的refer方法，这里会初始化监听器，包装：
+
+```
+public <T> Invoker<T> refer(Class<T> type, URL url) throws RpcException {
+    if (Constants.REGISTRY_PROTOCOL.equals(url.getProtocol())) {
+        return protocol.refer(type, url);
+    }
+    return new ListenerInvokerWrapper<T>(protocol.refer(type, url), 
+            Collections.unmodifiableList(
+                    ExtensionLoader.getExtensionLoader(InvokerListener.class)
+                    .getActivateExtension(url, Constants.INVOKER_LISTENER_KEY)));
+}
+```
+
 接着在返回到toInvokers方法，然后返回refreshInvoker方法的`Map<String, Invoker<T>> newUrlInvokerMap = toInvokers(invokerUrls) ;`这就获得了Invoker，接着就是方法名映射Invoker列表：`Map<String, List<Invoker<T>>> newMethodInvokerMap = toMethodInvokers(newUrlInvokerMap); `这里将invokers列表转成与方法的映射关系。到这里refreshInvoker方法就完成了，在往上就返回到AbstractRegistry的notify方法，到这里也完成了。
 
-到这里有关消费者端注册到注册中心和订阅注册中心就完事儿了，这部分是在RegistryProtocol .doRefer方法中，这个方法最后一句是`return cluster.join(directory);`，这里由Cluster组件创建一个Invoker并返回，这里的cluster默认是用FailoverCluster，最后返回的是经过MockClusterInvoker包装过的FailoverCluster。继续返回到ReferenceConfig中createProxy方法，这时候我们已经完成了消费者端引用服务的Invoker。然后最后返回的是根据我们得到的invoker创建的服务代理`return (T) proxyFactory.getProxy(invoker);`。这里proxyFactory是我们在最上面列出的动态生成的代码。
+#### 创建服务代理
+
+到这里有关消费者端注册到注册中心和订阅注册中心就完事儿了，这部分是在RegistryProtocol.doRefer方法中，这个方法最后一句是`return cluster.join(directory);`，这里由Cluster组件创建一个Invoker并返回，这里的cluster默认是用FailoverCluster，最后返回的是经过MockClusterInvoker包装过的FailoverCluster。继续返回到ReferenceConfig中createProxy方法，这时候我们已经完成了消费者端引用服务的Invoker。然后最后返回的是根据我们得到的invoker创建的服务代理`return (T) proxyFactory.getProxy(invoker);`。这里proxyFactory是我们在最上面列出的动态生成的代码。
 
 首先经过AbstractProxyFactory的处理：
 
