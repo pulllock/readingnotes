@@ -64,7 +64,7 @@ Spring中并没有定义AroundAdvice，而是使用`org.aopalliance.intercept.Me
 Introduction advice需要一个IntroductionAdvisor和一个IntroductionInterceptor配合。不常用，暂先不解释。
 
 # Advisor
-切面，包含一个Pointcut和一个Advice。
+切面，持有一个Advice引用。子接口PointcutAdvisor持有Pointcut的引用。
 
 ```
 public interface Advisor {
@@ -74,25 +74,127 @@ public interface Advisor {
 }
 ```
 
-# 使用ProxyFactoryBean创建AOP代理
-ProxyFactoryBean对Pointcut和Advice提供了完全的控制，还包括应用的顺序。ProxyFactoryBean的getObject方法会返回一个AOP代理，包装了目标对象。首先从getObject开始切入：
+## Advised
+Advised接口支持多个Advisor或者Advice，加入了需要代理的源对象，需要代理的接口。实现类是AdvisedSupport。
+
+## AdvisedSupport
+实现了Advised接口，它可以动态添加，修改，删除通知和动态切换目标对象。
+
+# 例子
+使用接口的方式，配置文件：
 
 ```
-//当客户端获取bean的时候，会调用，返回一个代理
-public Object getObject() throws BeansException {
-	//判断是单例的还是prototype的
-    return (this.singleton) ? getSingletonInstance() : newPrototypeInstance();
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN//EN" "http://www.springframework.org/dtd/spring-beans.dtd">
+<beans>
+    <!--业务处理类，也就是被代理的类-->
+    <bean id="loginServiceImpl" class="me.cxis.spring.aop.LoginServiceImpl"/>
+
+    <!--通知类-->
+    <bean id="logBeforeLogin" class="me.cxis.spring.aop.LogBeforeLogin"/>
+
+    <!--代理类-->
+    <bean id="loginProxy" class="org.springframework.aop.framework.ProxyFactoryBean">
+        <property name="proxyInterfaces">
+            <value>me.cxis.spring.aop.LoginService</value>
+        </property>
+        <property name="interceptorNames">
+            <list>
+                <value>logBeforeLogin</value>
+            </list>
+        </property>
+        <property name="target">
+            <ref bean="loginServiceImpl"/>
+        </property>
+    </bean>
+</beans>
+```
+
+LoginService：
+
+```
+package me.cxis.spring.aop;
+
+public interface LoginService {
+    String login(String userName);
 }
 ```
 
-获取单例AOP代理的实例getSingletonInstance()：
+LoginServiceImpl：
+
+```
+package me.cxis.spring.aop;
+
+public class LoginServiceImpl implements LoginService {
+
+    public String login(String userName){
+        System.out.println("正在登录");
+        return "success";
+    }
+}
+```
+
+LogBeforeLogin：
+
+```
+package me.cxis.spring.aop;
+
+import org.springframework.aop.MethodBeforeAdvice;
+import java.lang.reflect.Method;
+
+public class LogBeforeLogin implements MethodBeforeAdvice {
+    public void before(Method method, Object[] objects, Object o) throws Throwable {
+        System.out.println("有人要登录了。。。");
+    }
+}
+```
+
+启动类Main：
+
+```
+package me.cxis.spring.aop;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.support.ClassPathXmlApplicationContext;
+
+public class Main {
+
+    public static void main(String[] args) {
+        ApplicationContext applicationContext = new ClassPathXmlApplicationContext("classpath:aop.xml");
+        LoginService loginService = (LoginService) applicationContext.getBean("loginProxy");
+        loginService.login("sdf");
+    }
+}
+```
+
+
+# 使用ProxyFactoryBean创建AOP代理
+ProxyFactoryBean对Pointcut和Advice提供了完全的控制，还包括应用的顺序。ProxyFactoryBean的getObject方法会返回一个AOP代理，包装了目标对象。
+
+Spring在初始化的过程中，createBean的时候，如果是FactoryBean的话，会调用` ((BeanFactoryAware)bean).setBeanFactory(this);`：
+
+```
+public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
+    this.beanFactory = beanFactory;
+    this.createAdvisorChain();
+    if(this.singleton) {
+        this.targetSource = this.freshTargetSource();
+        //获取单例实例的时候
+        this.getSingletonInstance();
+        this.addListener(this);
+    }
+
+}
+```
+
+看下获取单例实例的方法：
 
 ```
 private Object getSingletonInstance() {
-	//单例的会被缓存，所以先从缓存中查询
-    if (this.singletonInstance == null) {
+    if(this.singletonInstance == null) {
         this.singletonInstance = this.createAopProxy().getProxy();
     }
+
     return this.singletonInstance;
 }
 ```
@@ -155,20 +257,21 @@ public Object getProxy() {
 
 ```
 public Object getProxy(ClassLoader cl) {
+	//Enhancer是CGLIB中的主要操作类
     Enhancer e = new Enhancer();
     try {
+    	//从代理创建辅助类中获取在IoC容器中配置的目标对象
         Class rootClass = advised.getTargetSource().getTargetClass();
-
+		//将目标对象本身做为enhancer的基类
         e.setSuperclass(rootClass);
+        //将通知器中配置作为enhancer的方法过滤
         e.setCallbackFilter(new ProxyCallbackFilter(advised));
 
         e.setStrategy(new UndeclaredThrowableStrategy(UndeclaredThrowableException.class));
-
-
+		//设置enhancer的接口
         e.setInterfaces(AopProxyUtils.completeProxiedInterfaces(advised));
-
+		//设置enhancer的回调方法
         Callback[] callbacks = getCallbacks(rootClass);
-
         e.setCallbacks(callbacks);
 
         Class[] types = new Class[callbacks.length];
@@ -176,14 +279,74 @@ public Object getProxy(ClassLoader cl) {
         for (int x = 0; x < types.length; x++) {
             types[x] = callbacks[x].getClass();
         }
+        //设置enhancer的回调类型
         e.setCallbackTypes(types);
-
+		//创建代理对象
         return e.create();
     }
     catch (CodeGenerationException ex) {。。。}
 }
 ```
-可以看到这里是使用cglib的方式去创建，不太熟悉，暂先略过。
+可以看到这里是使用cglib的方式去创建。当调用目标方法时，会去调用DynamicAdvisedInterceptor的intercept方法对目标对象进行处理：
+
+```
+public Object intercept(Object proxy, Method method, Object[] args,
+        MethodProxy methodProxy) throws Throwable {
+
+        MethodInvocation invocation = null;
+        Object oldProxy = null;
+        boolean setProxyContext = false;
+
+        Class targetClass = null; //targetSource.getTargetClass();
+        Object target = null;
+
+        try {
+            Object retVal = null;
+
+
+            target = getTarget();
+            if (target != null) {
+                targetClass = target.getClass();
+            }
+			//如果通知器暴露了代理
+            if (advised.exposeProxy) {
+                //设置给定的代理对象为要被拦截的代理
+                oldProxy = AopContext.setCurrentProxy(proxy);
+                setProxyContext = true;
+            }
+			//获取AOP配置的通知
+            List chain = advised.getAdvisorChainFactory()
+                .getInterceptorsAndDynamicInterceptionAdvice(advised,
+                    proxy, method, targetClass);
+
+            //如果没有配置通知 
+            if (chain.isEmpty()) {
+                //直接调用目标对象的方法
+                retVal = methodProxy.invoke(target, args);
+            }
+            else {
+                //如果配置了通知
+                //通过MethodInvocationImpl来启动配置的通知
+                invocation = new MethodInvocationImpl(proxy, target,
+                    method, args, targetClass, chain, methodProxy);
+                retVal = invocation.proceed();
+            }
+			//获取目标对象对象方法的回调结果，如果有必要则封装为代理
+            retVal = massageReturnTypeIfNecessary(proxy, target, retVal);
+            return retVal;
+        }
+        finally {
+            if (target != null) {
+                releaseTarget(target);
+            }
+
+            if (setProxyContext) {
+                // Restore old proxy
+                AopContext.setCurrentProxy(oldProxy);
+            }
+        }
+    }
+```
 
 ## 使用JDK动态代理生成AOP代理
 也是直接返回一个实例`new JdkDynamicAopProxy(advisedSupport);`。获取代理的方法同样是getProxy方法：
@@ -213,7 +376,7 @@ public Object invoke(Object proxy, Method method, Object[] args) throws Throwabl
     //原来的代理
     Object oldProxy = null;
     boolean setProxyContext = false;
-
+	//通知的目标源
     TargetSource targetSource = advisedSupport.targetSource;
     Class targetClass = null;
     Object target = null;		
@@ -224,153 +387,58 @@ public Object invoke(Object proxy, Method method, Object[] args) throws Throwabl
             return equals(args[0]) ? Boolean.TRUE : Boolean.FALSE;
         }
         else if (Advised.class == method.getDeclaringClass()) {
-            //目标对象方法的调用
+            //如果AOP配置了通知，使用反射机制调用通知的同名方法
             return AopProxyUtils.invokeJoinpointUsingReflection(this.advisedSupport, method, args);
         }
 
         Object retVal = null;
 
-        // May be null. Get as late as possible to minimize the time we "own" the target,
-        // in case it comes from a pool.
+        //目标对象
         target = targetSource.getTarget();
         if (target != null) {
             targetClass = target.getClass();
         }
-
+		//如果当前通知暴露了代理，将当前代理使用currentProxy()方法变为可用代理
         if (this.advisedSupport.exposeProxy) {
             // Make invocation available if necessary
             oldProxy = AopContext.setCurrentProxy(proxy);
             setProxyContext = true;
         }
 
-        // Get the interception chain for this method
+        //获取目标对象方法配置的拦截器(通知器)链  
         List chain = this.advisedSupport.advisorChainFactory.getInterceptorsAndDynamicInterceptionAdvice(
                 this.advisedSupport, proxy, method, targetClass);
 
-        // Check whether we have any advice. If we don't, we can fallback on
-        // direct reflective invocation of the target, and avoid creating a MethodInvocation
+        //没有配置任何通知
         if (chain.isEmpty()) {
-            // We can skip creating a MethodInvocation: just invoke the target directly
-            // Note that the final invoker must be an InvokerInterceptor so we know it does
-            // nothing but a reflective operation on the target, and no hot swapping or fancy proxying
+            //没有配置通知，使用反射直接调用目标对象的方法，并获取方法返回值
             retVal = AopProxyUtils.invokeJoinpointUsingReflection(target, method, args);
         }
-        else {
-            // We need to create a method invocation...
-            //invocation = advised.getMethodInvocationFactory().getMethodInvocation(proxy, method, targetClass, target, args, chain, advised);
-
+        else {//配置了通知
+        	//为目标对象创建方法回调对象，需要在调用通知之后才调用目标对象的方法
             invocation = new ReflectiveMethodInvocation(proxy, target,
                                 method, args, targetClass, chain);
 
-            // Proceed to the joinpoint through the interceptor chain
+            //调用通知链，沿着通知器链调用所有配置的通知
             retVal = invocation.proceed();
         }
 
-        // Massage return value if necessary
+        //如果方法有返回值，则将代理对象最为方法返回
         if (retVal != null && retVal == target) {
-            // Special case: it returned "this"
-            // Note that we can't help if the target sets
-            // a reference to itself in another returned object
             retVal = proxy;
         }
         return retVal;
     }
     finally {
         if (target != null && !targetSource.isStatic()) {
-            // Must have come from TargetSource
+            //释放目标对象
             targetSource.releaseTarget(target);
         }
 
         if (setProxyContext) {
-            // Restore old proxy
+            //存储代理对象
             AopContext.setCurrentProxy(oldProxy);
         }
-    }
-}
-```
-
-# Spring在bean初始化过程中对AOP的处理
-在AbstractAutowireCapableBeanFactory的createBean方法中，会调用applyBeanPostProcessorsAfterInitialization(bean, beanName);方法：
-
-```
-public Object applyBeanPostProcessorsAfterInitialization(Object bean, String name) throws BeansException {
-    Object result = bean;
-    for (Iterator it = getBeanPostProcessors().iterator(); it.hasNext();) {
-        BeanPostProcessor beanProcessor = (BeanPostProcessor) it.next();
-        //这里进入AbstractAutoProxyCreator的postProcessAfterInitialization方法
-        result = beanProcessor.postProcessAfterInitialization(result, name);
-        if (result == null) {
-            throw new BeanCreationException( );
-        }
-    }
-    return result;
-}
-```
-AbstractAutoProxyCreator的postProcessAfterInitialization方法：
-
-```
-//使用配置的interceptor来创建一个代理
-public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
-    // Check for special cases. We don't want to try to autoproxy a part of the autoproxying
-    // infrastructure, lest we get a stack overflow.
-    if (isInfrastructureClass(bean, beanName) || shouldSkip(bean, beanName)) {
-        logger.debug("Did not attempt to autoproxy infrastructure class [" + bean.getClass().getName() + "]");
-        return bean;
-    }
-
-    TargetSource targetSource = getCustomTargetSource(bean, beanName);
-
-    Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(bean, beanName, targetSource);
-
-    // proxy if we have advice or if a TargetSourceCreator wants to do some
-    // fancy stuff such as pooling
-    if (specificInterceptors != DO_NOT_PROXY || targetSource != null) {
-
-        if (targetSource == null) {
-            // use default of simple, default target source
-            targetSource = new SingletonTargetSource(bean);
-        }
-
-        // handle prototypes correctly
-        Advisor[] commonInterceptors = resolveInterceptorNames();
-
-        List allInterceptors = new ArrayList();
-        if (specificInterceptors != null) {
-            allInterceptors.addAll(Arrays.asList(specificInterceptors));
-            if (commonInterceptors != null) {
-                if (this.applyCommonInterceptorsFirst) {
-                    allInterceptors.addAll(0, Arrays.asList(commonInterceptors));
-                }
-                else {
-                    allInterceptors.addAll(Arrays.asList(commonInterceptors));
-                }
-            }
-        }
-
-        ProxyFactory proxyFactory = new ProxyFactory();
-        // copy our properties (proxyTargetClass) inherited from ProxyConfig
-        proxyFactory.copyFrom(this);
-
-        if (!getProxyTargetClass()) {
-            // Must allow for introductions; can't just set interfaces to
-            // the target's interfaces only.
-            Class[] targetsInterfaces = AopUtils.getAllInterfaces(bean);
-            for (int i = 0; i < targetsInterfaces.length; i++) {
-                proxyFactory.addInterface(targetsInterfaces[i]);
-            }
-        }
-
-        for (Iterator it = allInterceptors.iterator(); it.hasNext();) {
-            Advisor advisor = this.advisorAdapterRegistry.wrap(it.next());
-            proxyFactory.addAdvisor(advisor);
-        }
-        proxyFactory.setTargetSource(targetSource);
-        customizeProxyFactory(bean, proxyFactory);
-		//获取并返回代理对象，这就跟上面的一样了，不再说明
-        return proxyFactory.getProxy();
-    }
-    else {
-        return bean;
     }
 }
 ```
