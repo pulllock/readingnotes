@@ -207,13 +207,16 @@ private ExtensionLoader(Class<?> type) {
     //对于扩展类型是ExtensionFactory的，设置为null
     //getAdaptiveExtension方法获取一个运行时自适应的扩展类型
     //每个Extension只能有一个@Adaptive类型的实现，如果么有，dubbo会自动生成一个类
-    //objectFactory是一个ExtensionFactory类型的属性，主要用于加载扩展的实现
+    //objectFactory是一个ExtensionFactory类型的属性，主要用于加载需要注入的类型的实现
+    //objectFactory主要用在注入那一步，详细说明见注入时候的说明
+    //这里记住非ExtensionFactory类型的返回的都是一个AdaptiveExtensionFactory
     objectFactory = (type == ExtensionFactory.class ? null : ExtensionLoader.getExtensionLoader(ExtensionFactory.class).getAdaptiveExtension());
 }
 ```
-不难理解，ExtensionFactory是
+不难理解，ExtensionFactory是主要是用来加载被注入的类的实现，分为SpiExtensionFactory和SpringExtensionFactory两个，分别用来加载SPI扩展实现和Spring中bean的实现。
 
-加载是在调用getAdaptiveExtension()方法中进行的：
+## 获取自适应实现
+上面返回一个ExtensionLoader的实例之后，开始加载自适应实现，加载是在调用getAdaptiveExtension()方法中进行的：
 
 ```
 getAdaptiveExtension()-->
@@ -223,8 +226,6 @@ getAdaptiveExtension()-->
                                                                 loadExtensionClasses()
 
 ```
-
-## 获取自适应实现
 
 先看下getAdaptiveExtension()方法，用来获取一个扩展的自适应实现类，最后返回的自适应实现类是一个类名为`Protocol$Adaptive`的类，并且这个类实现了Protocol接口：
 
@@ -256,7 +257,7 @@ public T getAdaptiveExtension() {
 ```
 ### 创建自适应扩展
 
-接着看下createAdaptiveExtension()方法，用来创建自适应扩展类的实例：
+缓存中不存在自适应扩展的实例，表示还没有创建过自适应扩展的实例，接下来就是创建自适应扩展实现，createAdaptiveExtension()方法，用来创建自适应扩展类的实例：
 
 ```
 private T createAdaptiveExtension() {
@@ -275,6 +276,7 @@ private T createAdaptiveExtension() {
 private Class<?> getAdaptiveExtensionClass() {
     //加载当前Extension的所有实现（这里举例是Protocol，只会加载Protocol的所有实现类），如果有@Adaptive类型的实现类，会赋值给cachedAdaptiveClass
     //目前只有AdaptiveExtensionFactory和AdaptiveCompiler两个实现类是被注解了@Adaptive
+    //除了ExtensionFactory和Compiler类型的扩展之外，其他类型的扩展都是下面动态创建的的实现
     getExtensionClasses();
     //加载完所有的实现之后，发现有cachedAdaptiveClass不为空
     //也就是说当前获取的自适应实现类是AdaptiveExtensionFactory或者是AdaptiveCompiler，就直接返回，这两个类是特殊用处的，不用代码生成，而是现成的代码
@@ -282,7 +284,7 @@ private Class<?> getAdaptiveExtensionClass() {
         return cachedAdaptiveClass;
     }
     //没有找到Adaptive类型的实现，动态创建一个
-    //比如Protocol的实现类，没有任何一个是用@Adaptive来直接的，只有Protocol接口的方法是有注解的
+    //比如Protocol的实现类，没有任何一个实现是用@Adaptive来注解的，只有Protocol接口的方法是有注解的
     //这时候就需要来动态的生成了，也就是生成Protocol$Adaptive
     return cachedAdaptiveClass = createAdaptiveExtensionClass();
 }
@@ -745,6 +747,15 @@ objectFactory的来路，在ExtensionLoader中有个私有构造器：
 private ExtensionLoader(Class<?> type) {
     this.type = type;
     //这里会获得一个AdaptiveExtensionFactory
+    //根据类型和名称信息从ExtensionFactory中获取
+    //获取实现
+    //为什么要使用对象工厂来获取setter方法中对应的实现？
+    //不能通过spi直接获取自适应实现吗？比如ExtensionLoader.getExtension(pt);
+    //因为setter方法中有可能是一个spi，也有可能是普通的bean
+    //所以此时不能写死通过spi获取，还需要有其他方式来获取实现进行注入
+    // dubbo中有两个实现，一个是spi的ExtensionFactory，一个是spring的ExtensionFactory
+    //如果还有其他的，我们可以自定义ExtensionFactory
+    //objectFactory是AdaptiveExtensionFactory实例
     objectFactory = (type == ExtensionFactory.class ? null : ExtensionLoader.getExtensionLoader(ExtensionFactory.class).getAdaptiveExtension());
 }
 ```
