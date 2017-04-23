@@ -349,7 +349,7 @@ public <T> T getProxy(Invoker<T> invoker, Class<?>[] interfaces) {
 ```
 使用Java的反射机制生成一个代理类。
 
-## 暴露远程服务时导出Invoker为Exporter
+# 暴露远程服务时导出Invoker为Exporter
 Invoker导出为Exporter分为两种情况，第一种是Registry类型的Invoker，第二种是其他协议类型的Invoker，分开解析。
 
 代码入口：
@@ -358,7 +358,7 @@ Invoker导出为Exporter分为两种情况，第一种是Registry类型的Invoke
 Exporter<?> exporter = protocol.export(invoker);
 ```
 
-### Registry类型的Invoker处理过程
+## Registry类型的Invoker处理过程
 
 大概的步骤是：
 
@@ -450,10 +450,10 @@ public <T> Exporter<T> export(final Invoker<T> originInvoker) throws RpcExceptio
 }
 ```
 
-#### 交给具体的协议去暴露服务
+### 交给具体的协议去暴露服务
 先不解析，留在后面，可以先去后面看下导出过程，然后再回来接着看注册到注册中心的过程。具体协议暴露服务主要是打开服务器和端口，进行监听。
 
-#### 连接注册中心并获取Registry实例
+### 连接注册中心并获取Registry实例
 具体的协议进行暴露并且返回了一个ExporterChangeableWrapper之后，接下来看下一步连接注册中心并注册到注册中心，代码是在RegistryProtocol的export方法：
 
 ```
@@ -579,7 +579,7 @@ public AbstractRegistry(URL url) {
     notify(url.getBackupUrls());
 }
 ```
-#### 获取Registry时的订阅
+### 获取Registry时的订阅
 notify()方法：
 
 ```
@@ -700,7 +700,7 @@ public ZookeeperRegistry(URL url, ZookeeperTransporter zookeeperTransporter) {
     });
 }
 ```
-#### 获取注册到注册中心的url
+### 获取注册到注册中心的url
 获取到了Registry，Registry实例中保存着连接到了zookeeper的zkClient实例之后，下一步获取要注册到注册中心的url（在RegistryProtocol中）。
 
 ```
@@ -711,7 +711,7 @@ final URL registedProviderUrl = getRegistedProviderUrl(originInvoker);
 //interface=dubbo.common.hello.service.HelloService&methods=sayHello&
 //organization=china&owner=cheng.xi&pid=9457&side=provider&timestamp=1489807681627
 ```
-#### 注册到注册中心
+### 注册到注册中心
 然后调用`registry.register(registedProviderUrl)`注册到注册中心（在RegistryProtocol中）。register方法的实现在FailbackRegistry中：
 
 ```
@@ -778,14 +778,14 @@ protected void doRegister(URL url) {
             provider%26timestamp%3D1489829293525
 ```
 
-#### 订阅注册中心的服务
+### 订阅注册中心的服务
 在注册到注册中心之后，registry会去订阅覆盖配置的服务，这一步之后就会在`/dubbo/dubbo.common.hello.service/HelloService`节点下多一个configurators节点。（具体过程暂先不解析）。
 
-#### 返回新Exporter实例
+### 返回新Exporter实例
 最后返回Exporter新实例，返回到ServiceConfig中。服务的发布就算完成了。
 
 
-### 交给具体的协议进行服务暴露
+## 交给具体的协议进行服务暴露
 这里也就是非Registry类型的Invoker的导出过程。主要的步骤是将本地ip和20880端口打开，进行监听。最后包装成exporter返回。
 
 doLocalExport(invoker)：
@@ -826,7 +826,7 @@ private <T> ExporterChangeableWrapper<T>  doLocalExport(final Invoker<T> originI
     return (ExporterChangeableWrapper<T>) exporter;
 }
 ```
-#### 使用dubbo协议导出
+### 使用dubbo协议导出
 这里`protocol.export(invokerDelegete)`就要去具体的DubboProtocol中执行了，DubboProtocol的外面包裹着ProtocolFilterWrapper，再外面还包裹着ProtocolListenerWrapper。会先经过ProtocolListenerWrapper：
 
 ```
