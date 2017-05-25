@@ -54,3 +54,12 @@ public LinkedHashMap(int initialCapacity,
     this.accessOrder = accessOrder;
 }
 ```
+# LinkedHashMap访问排序的原理
+
+```
+//true为访问顺序，false为插入顺序
+private final boolean accessOrder;
+```
+当指定了accessOrder为true的时候，是按照访问的顺序进行排序。也就是每次访问LinkedHashMap的时候，移除当前的key，然后将这个key放到最后。最后一次访问的元素总是在链表的末尾。
+
+基于HashMap来实现，可以保证移除元素比较快，查找需要移除的元素时候，不需要遍历整个LinkedHashMap，而LinkedList查找元素需要遍历。
