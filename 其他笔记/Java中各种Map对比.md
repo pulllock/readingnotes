@@ -4,6 +4,7 @@
 - IdentityHashMap，使用`==`判断相等，而HashMap使用equals判断相等，底层是数组，逻辑上可以看成是环形数组，存放元素如发现重入，则往后查找，找到空位置插入。
 - WeakHashMap，键是弱引用的，能实现对键值的动态回收。
 - ConcurrentHashMap，线程安全的，底层还是数组和链表，使用段锁来保证线程安全。
+- ConcurrentSkipListMap，和TreeMap类似，有序哈希表，线程安全的，支持排序，数据结构是跳表。
 
 # 含义
 
