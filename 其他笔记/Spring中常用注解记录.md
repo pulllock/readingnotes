@@ -206,6 +206,19 @@
 
 ### @Priority
 
+### @WebServlet
+### @WebFilter
+### @WebListener
+### @ServletComponentScan
+### @EnableGlobalMethodSecurity
+### @EnableWebSecurity
+### @EnableAuthorizationServer
+### @EnableOAuth2Client
+### @EnabelOAuth2Sso
+### @RabbitListener
+### @KafkaListener
+### @ConditionalOnClass
+### @ConditionalOnMissingClass
 
 ## Java注解
 ### @Resource
