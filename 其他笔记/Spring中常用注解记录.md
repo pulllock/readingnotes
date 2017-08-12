@@ -135,9 +135,79 @@
 ### @EnableRedisHttpSession
 
 ### @Entity
-`@Entity`表明这是一个实体Bean
+`@Entity`表明这是一个实体Bean 
 
-## JSR-250注解
+### @Lookup
+`@Lookup`定义一个lookup方法
+
+### @RequestScope
+`@RequestScope`表示一个组件的作用域是request
+
+### @SessionScope
+`@SessionScope`表示一个组件的作用域是session
+
+### @ApplicationScope
+`@ApplicationScope`表示一个组件的作用域是application
+
+### @EnableLoadTimeWeaving
+`@EnableLoadTimeWeaving`注册一个加载时织入
+
+### @EventListener
+`@EventListener`注册成一个事件监听器
+
+### @NumberFormat
+`@NumberFormat`格式化数字
+
+### @DateTimeFormat
+`@DateTimeFormat`格式化日期
+
+### @Transactional
+`@Transactional`注解事务
+
+### @GetMapping
+`@GetMapping`get方法和`@RequestMapping`
+
+### @PostMapping
+### @PutMapping
+### @DeleteMapping
+### @PatchMapping
+### @RestControllerAdvice
+### @RequestAttribute
+### @SessionAttribute
+### @CookieValue
+### @RequestHeader
+### @RequestPart
+### @CrossOrigin
+`@CrossOrigin`启用CORS
+
+### @EnableWebSocket
+`@EnableWebSocket`启用websocket支持
+
+### @EnableWebSocketMessageBroker
+`@EnableWebSocketMessageBroker`
+### @SendTo
+### @MessageMapping
+### @JmsListener
+### @EnableJms
+
+### @Cacheable
+`@Cacheable`声明式缓存
+
+### @CacheEvict
+`@CacheEvict`清除缓存
+
+### @CachePut
+`@CachePut`更新缓存
+
+### @Caching
+
+### @CacheConfig
+`@CacheConfig`缓存的配置类
+
+### @Priority
+
+
+## Java注解
 ### @Resource
 `@Resource`跟`@Autowired`类似，`@Resource`默认通过name属性匹配，找不到再按type匹配，`@Resource`是J2EE的注解。
 
@@ -147,7 +217,6 @@
 ### @PreDestory
 `@PreDestroy`指定销毁方法，会在Spring容器关闭前销毁Bean的时候被执行
 
-## JSR-330注解
 ### @Inject
 `@Inject`和`@Autowired`等价，只是没有required属性
 
@@ -156,6 +225,9 @@
 
 ### @Qualifier
 `@Qualifier`只对应于Spring的`@Qualifier`中扩展限定描述符注解，只做扩展，没有value属性
+
+### @ConstructorProperties
+`@ConstructorProperties`指明构造器属性名字
 
 ## JPA注解
 ### @PersistenceContext
