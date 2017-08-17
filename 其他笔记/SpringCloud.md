@@ -89,3 +89,59 @@ Ribbon Client端负载均衡
 - 创建一个注册中心，使用Eureka，提供服务的注册和发现，@EnableEurekaServer
 - 创建服务提供者，@EnableDiscoveryClient
 - 创建服务消费者，@EnableDiscoveryClient
+
+## Eureka服务注册和发现模块
+`@EnableEurekaServer`启用一个服务注册中心
+
+Eureka server默认情况下也是一个client，所以必须要指定一个是server，一般配置如下：
+
+```
+server:
+  port: 8761
+
+eureka:
+  client:
+    registerWithEureka: false
+    fetchRegistry: false
+  server:
+    waitTimeInMsWhenSyncEmpty: 0
+```
+当`eureka.client.registerWithEurka = false`和`fetchRegistry = false`时，说明是eureka server。
+
+`@EnableEurekaClient`启用一个eureka client，服务提供者
+
+## ribbon服务消费者
+ribbon是负载均衡客户端
+
+`@EnableDiscoveryClient`可以向服务中心注册
+
+`@LoadBalanced`可以开启负载均衡功能
+
+## Fegin服务消费者
+`@EnableFeignClients`开启Fegin功能
+
+Fegin是一个声明式的伪Http客户端，默认集成了Ribbon，默认实现了负载均衡的效果。
+
+`@FeginClient("service name")`来指定调用哪个服务
+
+## Hystrix断路由
+`@EnableHystrix`可以启动断路由
+
+`@HystrixCommand(fallbackMethod="xxx")`注解在服务上
+
+Fegin中默认启用了断路由
+
+`@EnableHystrixDashboard`可以启用断路由的仪表盘
+
+## Zuul路由网关
+Zuul主要功能是路由和过滤器，实现了负载均衡
+
+`@EnavleZuulProxy`开启
+
+## Spring Cloud Config分布式配置中心
+Spring Cloud Config提供一个服务端和客户端，来提供可扩展的配置服务
+
+`@EnableConfigServer`开启配置服务器
+
+## Spring Cloud Bus消息总线
+Spring Cloud Bus可以讲分布式节点和轻量的消息代理连接起来
