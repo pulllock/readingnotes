@@ -145,3 +145,6 @@ Spring Cloud Config提供一个服务端和客户端，来提供可扩展的配�
 
 ## Spring Cloud Bus消息总线
 Spring Cloud Bus可以讲分布式节点和轻量的消息代理连接起来
+
+## Spring Cloud Sleuth服务链路追踪
+zipkin组件
