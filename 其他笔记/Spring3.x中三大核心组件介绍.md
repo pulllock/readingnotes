@@ -1,0 +1,30 @@
+## 三大组件概览
+Beans，Context，Core三大组件：
+
+- Bean，是应用程序自定义对象，保存有数据。
+- Context，为bean的生存提供一个环境，保存和维护各个bean之间的对应关系，也就是我们的IOC容器。
+- Core，是Context在发现、建立、维护bean之间关系时候所需要的一些工具集合，比如资源的加载和资源的抽象等。
+
+## bean组件
+bean创建采用了工厂设计模式，顶级接口是BeanFactory，也就是bean工厂。ListableBeanFactory表示bean是可列表的，HierarchicalBeanFactory表示bean是有继承关系的，AutowireCapableBeanFactory定义了bean的自动装配规则，上面四个接口定义了bean的集合，bean的关系和行为，而默认实现类是DefaultListableBeanFactory。
+
+## bean的定义
+BeanDefinition表示bean的定义，Spring对于bean统一成一个定义来进行处理，保证能够统一的对bean进行操作。
+
+## bean的解析
+bean的解析就是Spring对配置文件进行解析，根据配置文件的信息生成bean对象的过程。
+
+## BeanFactory和FactoryBean
+BeanFactory是IOC容器的抽象，具体表现是ApplicationContext，XMLBeanFactory等。主要作用是实例化，定位，配置应用程序中bean对象，建立这些bean之间的依赖关系等。
+
+FactoryBean是一个特殊的bean，可以被ioc容器管理的bean，但是这个bean可以用来生成其他的bean，对它的调用返回的是工厂生产的bean，但是其返回的对象不是指定类一个对象实例，而是该工厂bean的getObject()方法所返回的对象。
+
+## Context组件
+Context组件是为Bean对象提供一个运行时环境，标识一个运行时环境，初始化BeanFactory，利用BeanFactory来对已经解析注册的bean进行创建，保证bean对象之间的关系。
+
+Context将Core组件和Bean组件融合到一起。Context根组件是ApplicationContext，继承了BeanFactory和Resource类。
+
+ApplicationContext可以支持不同的信息源，可以访问资源，支持应用事件机制。ConfigurableApplicationContext表示可修改的Context，在构建Context中用户可以动态添加或修改已有的配置信息。AbstractRefreshableApplicationContext表示可更新的Context。WebApplicationContext用于web可以直接访问到ServletContext。
+
+## Core组件
+主要定义了访问资源的方式，以及对各种资源进行用统一的接口来抽象。顶级接口为Resource。资源的加载有顶级接口ResourceLoader，默认的实现是DefaultResourceLoader。
