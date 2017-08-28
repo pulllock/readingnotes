@@ -8,6 +8,26 @@ Beans，Context，Core三大组件：
 ## bean组件
 bean创建采用了工厂设计模式，顶级接口是BeanFactory，也就是bean工厂。ListableBeanFactory表示bean是可列表的，HierarchicalBeanFactory表示bean是有继承关系的，AutowireCapableBeanFactory定义了bean的自动装配规则，上面四个接口定义了bean的集合，bean的关系和行为，而默认实现类是DefaultListableBeanFactory。
 
+BeanFactory的实现应该支持标准bean的生命周期：
+
+1. BeanNameAware的setBeanName
+2. BeanClassLoaderAware的setBeanClassLoader
+3. BeanFactoryAware的setBeanFactory
+4. ResourceLoaderAware的setResourceLoader（只适用于有Application Context的时候）
+5. ApplicationEventPublisherAware的setApplicationEventPublisher（只适用于有Application Context的时候）
+6. MessageSourceAware的setMessageSource（只适用于有Application Context的时候）
+7. ApplicationContextAware的setApplicationContext（只适用于有Application Context的时候）
+8. ServletContextAware的setServletContext（只适用于有Web Application Context的时候）
+9. BeanPostProcessors的postProcessBeforeInitialization方法
+10. InitializingBean的afterPropertiesSet
+11. 自定义的init-method
+12. BeanPostProcessors的postProcessAfterInitialization方法
+
+BeanFactory关闭的时候，声明周期方法如下：
+
+1. DisposableBean的destory方法
+2. 自定义的destory-method方法
+
 ## bean的定义
 BeanDefinition表示bean的定义，Spring对于bean统一成一个定义来进行处理，保证能够统一的对bean进行操作。
 
