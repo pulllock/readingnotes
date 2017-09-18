@@ -413,6 +413,15 @@ Class文件的头4个字节是魔数，确定这个文件是否能被虚拟机�
 ### 访问标志
 常量池结束后，紧接着的两个字节代表访问标志access_flags，用于识别类或者接口层次的访问信息。
 
+- ACC_PUBLIC，表示是否为public类型
+- ACC_FINAL，是否被声明为final，只有类可设置。
+- ACC_SUPER，是否允许使用invokespecial字节码指令的新语意。
+- ACC_INTERFACE，标识这是一个接口。
+- ACC_ABSTRACT，是否为abstract类型，接口和抽象类此标志为真，其他为假。
+- ACC_SYNTHETIC，标识这个类并非由用户代码产生的。
+- ACC_ANNOTATION，标识是一个注解。
+- ACC_ENUM，标识是一个枚举。
+
 ### 类索引，父类索引与接口索引集合
 类索引`this_class`和父类索引`super_class`都是u2类型的数据，接口索引interfaces是一组u2类型的数据集合，Class文件由这三项数据来确定这个类的继承关系。
 

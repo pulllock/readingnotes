@@ -54,9 +54,6 @@ Scope主要有一下几种：
 ## @Group
 `@Group`注解可以把多个benchmark定义为同一个group，它们会被同时执行，主要用于测试多个相互之间存在影响的方法。
 
-## @GroupThreads
-`@GroupThreads`可以标记每个测试，指定运行给定方法的线程数量
-
 ## @Level
 `@Level`注解用于控制`@Setup`和`@TearDown`的调用时机，默认是Level.Trial，即benchmark开始前和结束后。
 
