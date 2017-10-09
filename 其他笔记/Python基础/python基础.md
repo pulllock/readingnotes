@@ -93,4 +93,8 @@ for f in sorted(basket):
 
 `str.format()`可以把大括号替换成传入的参数
 
+### 文件读写
 
+`f.tell()`返回一个整数，代表文件对象在文件中的指针位置，该数值是从文件开头到指针处的比特数
+
+`f.seek(offset, from_what)`改变文件对象指针，从指定的from_what位置移动offset比特，form_what为0表示从文件开始处，为1表示从当前文件指针位置开始，2表示从文件末尾 开始
