@@ -98,3 +98,52 @@ for f in sorted(basket):
 `f.tell()`返回一个整数，代表文件对象在文件中的指针位置，该数值是从文件开头到指针处的比特数
 
 `f.seek(offset, from_what)`改变文件对象指针，从指定的from_what位置移动offset比特，form_what为0表示从文件开始处，为1表示从当前文件指针位置开始，2表示从文件末尾 开始
+
+### python标准库
+
+os 与操作系统交互：
+
+- `os.getcwd()`返回当前工作目录
+- `os.chdir('/xxx/xxxx')`改变工作目录
+- `os.system('mkdir xxx')`在系统的shell中执行命令
+
+shutil 用于对日常文件和目录管理
+
+- `shutil.copyfile('a.txt', 'b.txt')`
+- `shutil.move('build/xxxx', 'install_dir')`
+
+glob模块提供了一个函数用于从目录通配符搜索中生成文件列表
+
+- `glob.glob('*.py')`
+
+sys:
+
+- `sys.argv`可以打印命令行参数
+
+re 正则表达式工具
+
+math 为浮点运算提供了对底层c函数库的访问
+
+ramdom 提供了生成随机数的工具
+
+- `random.choice(['apple', 'pear', 'banana'])`
+- `random.random()`
+- `random.randrange(6)`
+
+urllib 处理http等请求
+
+smtplib 发送邮件
+
+datetime 日期和时间处理
+
+zlib 支持数据打包和压缩
+
+timeit 性能度量
+
+threading 多线程
+
+logging 日志
+
+array提供了array()对象
+
+collections提供了deque()对象
