@@ -38,3 +38,47 @@ python3中已经将一般整形和长整型合二为一了！
 列表支持切片操作，返回的新列表是一个新的浅拷贝副本
 
 `append()`方法可以在列表末尾添加新的元素
+
+### 循环技巧
+
+在字典中循环时，key和value可以用items()方法同时读出来：
+
+```
+adict = {'sam':'sammy', 'bob':'boby'}
+for k, v in adict.items():
+	print(k, v)
+```
+
+在序列中循环时，索引和值可以使用enumerate()得到：
+
+```
+for i, v in enumerate(['tic', 'tac', 'toe']:
+	print(i, v))
+```
+
+同时循环两个或者更多的序列，可以使用zip()方法打包：
+
+```
+questions = ['name', 'quest', 'color']
+answers = ['fk', 'shshhs', 'yellow']
+
+for q, a in zip(questions, answwes):
+	print(q, a)
+```
+
+逆向循环序列，reversed()：
+
+```
+for i in reversed(range(1,10)):
+	print(i)
+```
+
+按照排序后的序列排序，使用sorted()：
+
+```
+basket = ['orange', 'pear', 'apple', 'banaba']
+for f in sorted(basket):
+	print(f)
+```
+
+
