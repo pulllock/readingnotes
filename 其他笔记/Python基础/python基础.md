@@ -81,4 +81,16 @@ for f in sorted(basket):
 	print(f)
 ```
 
+### 格式化输出
+
+`str.rjust()`把字符串输出到一列，并通过向左侧填充空格来使其右对齐
+
+`str.ljust()`左对齐
+
+`str.center()`中间对齐
+
+`str.zfill()`向数值字符串的左侧填充0
+
+`str.format()`可以把大括号替换成传入的参数
+
 
