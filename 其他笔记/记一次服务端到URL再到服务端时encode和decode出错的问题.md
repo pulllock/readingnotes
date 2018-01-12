@@ -27,6 +27,31 @@
 2. 浏览器自动对url进行encode的了解。
 3. tomcat对url进行decode的了解。
 
+# Java URLEncoder URLDecoder
+
+使用方法如下：
+
+```
+public static void main(String[] args) throws UnsupportedEncodingException {
+	String url = "&xyz 1 中文bbb+aaa=222";
+	String encoded = URLEncoder.encode(url, "UTF-8");
+	System.out.println(encoded);
+
+	String decoded = URLDecoder.decode(encoded, "UTF-8");
+	System.out.println(decoded);
+}
+```
+
+输出：
+
+```
+%26xyz+1+%E4%B8%AD%E6%96%87bbb%2Baaa%3D222
+&xyz 1 中文bbb+aaa=222
+```
+可以看到&，空格，中文，+号，=号等都被编码了。
+
+ 
+
 # 参考
 http://www.cnblogs.com/liuhongfeng/p/5006341.html
 http://www.jinglingshu.org/?p=3345
