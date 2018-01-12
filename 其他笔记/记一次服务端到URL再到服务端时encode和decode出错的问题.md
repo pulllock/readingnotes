@@ -50,7 +50,12 @@ public static void main(String[] args) throws UnsupportedEncodingException {
 ```
 可以看到&，空格，中文，+号，=号等都被编码了。
 
+ 在Java URLEncoder中：
  
+ - 字母数字的字符：a-z，A-Z，0-9都保持原样
+ - 特殊字符：.（英文点），-（中横线），*（星号），_（下划线）都保持原样
+ - 空格转换成+加号
+ - 其他字符都进行编码
 
 # 参考
 http://www.cnblogs.com/liuhongfeng/p/5006341.html
