@@ -303,3 +303,21 @@ div{
 ## @import
 
 `@import`可以导入其他样式表。
+
+## 图像
+
+`background-image`背景图像。
+
+`background-repeat`重复图像，可选值：
+
+- repeat
+- repeat-x
+- repeat-y
+- no-repeat
+
+`background-attachment`用于指定背景图像在用户滚动页面时的移动方式，可选值：
+
+- fixed，固定在页面中一个位置。
+- scroll，跟随用户上下滚动。
+
+`background-position`指定背景图像在浏览器窗口中的位置。
