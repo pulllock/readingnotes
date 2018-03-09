@@ -204,3 +204,65 @@ preload属性告诉浏览器在页面加载时需要做什么，有三个值：
 - border-top-left-radius
 
 上面这些配合使用可以设置椭圆或者各种复杂形状。
+
+## 列表项目样式
+
+`list-style-type`允许控制项目符号的形状或样式，可以用到`<ol>`、`<ul>`、`<li>`元素上。
+
+在无序列表中使用时可选值为：none，disc，circle，square。
+
+在有序列表中使用时可选值为：decimal，decimal-leading-zero，lower-alpha，upper-alpha，lower-roman，upper-roman。
+
+`list-style-image`将一个图像作为项目符号使用。
+
+`list-style-position`默认情况下列表会缩进到页面中，该属性可以表明标记显示的位置，是包含在主题内容的盒子内部，还是其外部。可选值：
+
+- outside，标记位于文本的左侧，默认的处理方式。
+- inside，标记位于文本块的内部，同时文本会被缩进。
+
+## 表格属性
+
+`:hover`在用户把光标悬停在某个表格行时将此行高亮显示。
+
+`empty-cell>`属性，可以指定是否显示空单元格的边框，可选值：
+
+- show，显示空单元格边框。
+- hide，隐藏空单元格边框。
+- inherit，遵循外部表格的规则。
+
+`border-spacing`控制相邻单元格之间的距离。
+
+`border-collapse`来合并相邻的边框，可选值有：
+
+- collapse，尽可能将单元格相邻的边框合并为一个单独的边框。
+- separate，将相邻的边框分离。
+
+## 文本框样式
+
+`font-size`设置用户输入文本的大小。
+
+`color`设置文本颜色。
+
+`background-color`设置文本输入框的背景色。
+
+`border`在文本输入框的边缘增加边框。
+
+`border-radius`可以创建圆角。
+
+`:focus`用来在使用文本输入框时改变文本输入框的背景颜色。
+
+`:hover`用户将光标悬停在文本输入框时改变输入框的背景色。
+
+`background-image`增加背景图像。
+
+## 按钮样式
+
+`color`控制按钮上文本颜色。
+
+`text-shadow`展示3D效果的文本。
+
+`border-bottom`使按钮的下方边框稍粗一点。
+
+`background-color`使按钮从周围的项目中凸显出来
+
+`:hover`光标悬停在按钮上时，改变按钮的外观。
