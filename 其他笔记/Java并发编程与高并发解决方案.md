@@ -40,3 +40,42 @@ HashMap -> HashTable。
 
 Collections.synchronizedXXX(List,Set,Map)。
 
+
+
+### 并发容器J.U.C
+
+ArrayList -> CopyOnWriteArrayList。
+
+HashSet、TreeSet -> CopyOnWriteArraySet、ConcurrentSkipListSet。
+
+HashMap、TreeMap -> ConcurrentHashMap、ConcurrentSkipListMap。
+
+### AQS
+
+CLH队列。
+
+Sync queue 同步队列，双向列表。
+
+Condition queue 单向列表。
+
+- 使用Node实现FIFO队列，可用于构建锁或者其他同步装置的基础框架。
+- 使用int类型表示状态。
+- 使用方法是继承。
+- 子类通过继承并通过实现它的方法管理其状态的方法操作状态。
+- 可以同时实现排它锁和共享锁模式。
+
+### AQS同步组件
+
+- CountDownLatch
+- Semaphore
+- CyclicBarrier
+- ReentrantLock
+- Condition
+- FutureTask
+
+#### CountDownLatch
+
+countDown
+
+await
+
