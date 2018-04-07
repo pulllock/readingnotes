@@ -79,3 +79,12 @@ countDown
 
 await
 
+#### Semaphore
+
+#### CyclicBarrier
+
+CountDownLatch只能使用一次，CyclicBarrier可以使用多次。
+
+ CountDownLatch表示一个或者多个线程需要等待其他线程完成某项操作后才能继续执行。
+
+CyclicBarrier实现了多个线程之间相互等待，直到所有线程都满足了之后，才能继续往下执行。
