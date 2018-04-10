@@ -112,3 +112,46 @@ CyclicBarrier实现了多个线程之间相互等待，直到所有线程都满�
 #### FutureTask
 
 ### Fork/Join框架
+
+### BlockingQueue
+
+#### ArrayBlockingQueue
+
+#### DelayQueue
+
+#### LinkedBlockingQueue
+
+#### PriorityBlockingQueue
+
+#### SynchronousQueue
+
+## 线程池
+
+### ThreadPoolExecutor
+
+- corePoolSize 核心线程数量
+- maximumPoolSize 线程最大线程数
+- workQueue 阻塞队列
+- keepAliveTime
+- unit
+- threadFactory 线程工厂
+- rejectHandler
+
+状态
+
+- Running
+- Shutdown
+- stop
+- Tidying
+- Terminated
+
+方法
+
+- execute() 提交任务，交给线程池执行
+- submit() 提交任务，能返回结果
+- shutdown()
+- shutdownNow()
+- getTaskCount
+- getCompletedTaskCount()
+- getPoolSize()
+- getActiveCount()
