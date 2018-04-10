@@ -155,3 +155,10 @@ CyclicBarrier实现了多个线程之间相互等待，直到所有线程都满�
 - getCompletedTaskCount()
 - getPoolSize()
 - getActiveCount()
+
+### Executors
+
+- newCachedTheadPool
+- newFixedThreadPool
+- newScheduledTheadPool
+- newSingleThreadExecutor
