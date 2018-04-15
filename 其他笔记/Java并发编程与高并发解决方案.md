@@ -162,3 +162,39 @@ CyclicBarrier实现了多个线程之间相互等待，直到所有线程都满�
 - newFixedThreadPool
 - newScheduledTheadPool
 - newSingleThreadExecutor
+
+## 死锁
+
+必要条件：
+
+- 互斥条件
+- 请求和保持条件
+- 不剥夺条件
+- 环路等待条件
+
+## 多线程并发最佳实践
+
+- 使用本地变量
+- 使用不可变类
+- 最小化锁的作用域范围 S=1/(1-a+a/n)
+- 使用线程池的Executor，不直接使用new Thread执行
+- 宁可使用同步，不要使用线程的wait和notify
+- 使用BlockingQueue实现生产-消费模式
+- 使用并发集合，而不是加锁的同步集合
+- 使用Semaphore创建有界的访问
+- 使用同步代码块，不使用同步方法
+- 避免使用静态变量
+
+## Spring与线程安全
+
+## HashMap与ConcurrentHashMap
+
+## 高并发之扩容思路
+
+- 垂直扩容
+- 水平扩容
+
+### 扩容-数据库
+
+- 读操作扩展：memcache、redis、CDN
+- 写操作扩展：Cassandra、Hbase
