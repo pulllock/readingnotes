@@ -51,11 +51,21 @@ public static void main(String[] args) throws UnsupportedEncodingException {
 可以看到&，空格，中文，+号，=号等都被编码了。
 
  在Java URLEncoder中：
- 
+
  - 字母数字的字符：a-z，A-Z，0-9都保持原样
  - 特殊字符：.（英文点），-（中横线），*（星号），_（下划线）都保持原样
  - 空格转换成+加号
  - 其他字符都进行编码
+
+# 浏览器对url自动进行encode和decode
+
+RFC1738g规定只有字母和数字，以及一些特殊符号`$ - _ . + ! * ' () ,`以及某些保留字，才可以不编码，可直接用于URL。
+
+如果url中有其他字符，比如汉字，浏览器就必须要对url进行编码，此时就会产生问题，各个浏览器编码方式都不一样，导致浏览器编码后的url也不一样，同样的url如果进行编码后，传到服务端之后，该按照怎么样的方式进行解码，也成了一个问题。
+
+具体的可以参考阮一峰的文章：[关于URL编码](http://www.ruanyifeng.com/blog/2010/02/url_encoding.html)
+
+# tomcat对url进行decode
 
 # 参考
 http://www.cnblogs.com/liuhongfeng/p/5006341.html
