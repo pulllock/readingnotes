@@ -85,5 +85,40 @@ zookeeper的临时节点，session创建的时候存在，session结束就被删
 
 创建znode的时候还可以请求在路径的最后追加一个单调递增的计数器，这个计数器在父节点时唯一的。
 
+## zookeeper里的计时
 
+### zxid
+
+每个zookeeper状态的变化都以zxid（事务id）的形式接收到标记，这个暴露了zookeeper所有变化的总排序。每个变化都会有一个zxid，并且如果zxid1早于zxid2，则1一定小于2。
+
+### 版本号
+
+节点的每个变化都会引起那个节点的版本号的其中之一的增加，三个版本号是：
+
+- version，znode的数据变化版本号。
+- cversion，子目录的变化版本号。
+- aversion，访问控制列表的变化版本号。
+
+### ticks
+
+使用多服务器的zookeeper时，服务器使用ticks定义事件的时间，如状态上传、会话超时、同事之间的连接超时等。
+
+### real time
+
+zookeeper不使用实时或者时钟时间，除了将时间戳加在znode创建和更新的stat结构上。
+
+## Stat结构
+
+stat结构字段：
+
+- czxid，引起这个znode创建的zxid。
+- mzxid，znode最后更新的zxid。
+- ctime，znode被创建的毫秒数，从1970开始。
+- mtime，znode最后被修改的毫秒数，从1970开始。
+- version，znode数据变化版本号。
+- cversion，znode子节点变化版本号。
+- aversion，znode访问控制列表的变化版本号。
+- ephemeralOwner，如果是临时节点，这个是znode拥有者的session id，如果不是临时节点，则是0。
+- dataLength，znode的数据长度。
+- numChildren，znode子节点数量。
 
