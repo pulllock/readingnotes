@@ -71,3 +71,27 @@
 
 - 客户端不知道它所需要的对象的类，只需要知道对应的工厂。
 - 抽象工厂类通过其子类来指定创建哪个对象。在工厂方法模式中，对于抽象工厂类只需要提供一个创建产品的接口，而由其子类来确定具体要创建的对象，利用面向对象的多态性和里氏替换原则，在程序运行时，子类对象将覆盖父类对象，从而使系统更容易扩展。
+
+### Spring中的工厂方法模式
+
+Spring中提供了一个FactoryBean接口，这个接口是一个工厂Bean，不是用来创建自身的，而是给其他类创建Bean的。FactoryBean的抽象实现AbstractFactoryBean可以看到工厂方法模式的实现：
+
+```
+public abstract class AbstractFactoryBean<T>
+		implements FactoryBean<T>, BeanClassLoaderAware, BeanFactoryAware, InitializingBean, DisposableBean {
+	@Override
+	public final T getObject() throws Exception {
+		if (isSingleton()) {
+			return (this.initialized ? this.singletonInstance : getEarlySingletonInstance());
+		}
+		else {
+			return createInstance();
+		}
+	}
+	
+	protected abstract T createInstance() throws Exception;
+}
+```
+
+可以看到，getObject方法用来获取Bean实例，在获取之前做了一些前置操作，然后才调用createInstance方法进行Bean实例的创建，并且该方法由子类来具体实现。AbstractFactoryBean的子类有很多，用来创建不同类型的Bean，但是创建Bean之前的一些公共工作就可以由父类来实现。
+
