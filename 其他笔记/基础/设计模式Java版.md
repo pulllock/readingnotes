@@ -261,5 +261,7 @@ public class Runtime {
 
 缺省适配器模式（Default Adapter Pattern），当不需要实现一个接口所提供的所有方法，可以先设计一个抽象类实现该接口，并为接口中每一个方法提供一个默认实现，那么该抽象类的子类可以选择性的覆盖父类的某些方法来实现需求，他适用于不想使用一个接口中所有方法的情况，又称为单接口适配器模式。
 
+### Spring中的适配器模式
 
-
+- Advice封装成相关的Interceptor。
+- Spring mvc中获取handlerAdapter。
