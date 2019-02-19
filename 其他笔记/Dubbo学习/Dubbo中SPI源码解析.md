@@ -62,6 +62,13 @@ private static final ConcurrentMap<Class<?>, ExtensionLoader<?>> EXTENSION_LOADE
 ```
 private ExtensionLoader(Class<?> type) {
     this.type = type;
+    /**
+     * 对于扩展类型是ExtensionFactory的，设置为null
+     * getAdaptiveExtension方法获取一个运行时自适应的扩展类型
+     * 每个Extension只能有一个@Adaptive类型的实现，如果么有，dubbo会自动生成一个类
+     * objectFactory是一个ExtensionFactory类型的属性，主要用于加载扩展的实现
+     */
+
     objectFactory = (
             type == ExtensionFactory.class ?
                     null :
@@ -70,7 +77,3 @@ private ExtensionLoader(Class<?> type) {
 }
 ```
 
-这里做了两件事：
-
-1. 将当前类型赋值给当前`ExtensionLoader`实例的type字段。
-2. 为当前实例创建一个Extension工厂。
