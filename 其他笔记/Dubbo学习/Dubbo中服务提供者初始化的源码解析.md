@@ -330,8 +330,261 @@ protected List<URL> loadRegistries(boolean provider) {
 加载完注册中心URL之后，就是挨个去导出服务的过程了，具体的方法是doExportUrlsFor1Protocol：
 
 ```java
+private void doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List<URL> registryURLs) {
 
+	......
+	
+	// 导出服务
+	String contextPath = protocolConfig.getContextpath();
+	if ((contextPath == null || contextPath.length() == 0) && provider != null) {
+		contextPath = provider.getContextpath();
+	}
+	// 创建服务所在的url
+	// dubbo://192.168.110.197:20880/dubbo.common.hello.service.HelloService?anyhost=true&application=dubbo-provider&application.version=1.0&dubbo=2.5.3
+	// &environment=product&interface=dubbo.common.hello.service.HelloService&methods=sayHello&organization=china&owner=cheng.xi&pid=28191
+	// &side=provider&timestamp=1489027396094
+	URL url = new URL(name, host, port, (contextPath == null || contextPath.length() == 0 ? "" : contextPath + "/") + path, map);
+
+	if (ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class)
+			.hasExtension(url.getProtocol())) {
+		url = ExtensionLoader.getExtensionLoader(ConfiguratorFactory.class)
+				.getExtension(url.getProtocol()).getConfigurator(url).configure(url);
+	}
+
+	String scope = url.getParameter(Constants.SCOPE_KEY);
+	// 配置为none不暴露
+	if (! Constants.SCOPE_NONE.toString().equalsIgnoreCase(scope)) {
+
+		// 配置不是remote的情况下做本地暴露 (配置为remote，则表示只暴露远程服务)
+		if (!Constants.SCOPE_REMOTE.toString().equalsIgnoreCase(scope)) {
+			exportLocal(url);
+		}
+		// 如果配置不是local则暴露为远程服务.(配置为local，则表示只暴露本地服务)
+		if (! Constants.SCOPE_LOCAL.toString().equalsIgnoreCase(scope) ){
+			if (logger.isInfoEnabled()) {
+				logger.info("Export dubbo service " + interfaceClass.getName() + " to url " + url);
+			}
+			if (registryURLs != null && registryURLs.size() > 0
+					&& url.getParameter("register", true)) {
+				for (URL registryURL : registryURLs) {
+					url = url.addParameterIfAbsent("dynamic", registryURL.getParameter("dynamic"));
+					URL monitorUrl = loadMonitor(registryURL);
+					if (monitorUrl != null) {
+						url = url.addParameterAndEncoded(Constants.MONITOR_KEY, monitorUrl.toFullString());
+					}
+					if (logger.isInfoEnabled()) {
+						logger.info("Register dubbo service " + interfaceClass.getName() + " url " + url + " to registry " + registryURL);
+					}
+					// 获取Invoker
+					// proxyFactory是动态生成的代码，其中的getInvoker是调用JavassistProxyFactory(外面还有一层StubProxyFactoryWrapper的包装)的getInvoker方法
+					Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, registryURL.addParameterAndEncoded(Constants.EXPORT_KEY, url.toFullString()));
+					// 根据协议将invoker暴露成exporter
+					// 暴露封装服务的invoker
+					Exporter<?> exporter = protocol.export(invoker);
+					exporters.add(exporter);
+				}
+			} else {
+				Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, url);
+
+				Exporter<?> exporter = protocol.export(invoker);
+				exporters.add(exporter);
+			}
+		}
+	}
+	this.urls.add(url);
+}
 ```
 
+代码较多，省略了上面的代码，代码主要逻辑是将配置的各种字段信息都放到map中去，然后获取主机名端口号等等信息，这些数据都是将要用来组装URL的，具体的不介绍，直接从组装URL这部分开始看。
 
+## 组装URL
+
+根据参数组装URL，就是实例化一个URL对象。URL相当于dubbo的总线，十分重要。最后得到的url类似：
+
+`dubbo://192.168.110.197:20880/dubbo.common.hello.service.HelloService?anyhost=true&application=dubbo-provider&application.version=1.0&dubbo=2.5.3&environment=product&interface=dubbo.common.hello.service.HelloService&methods=sayHello&organization=china&owner=cheng.xi&pid=28191&side=provider&timestamp=1489027396094`
+
+## 导出服务
+
+导出服务分为两种：导出本地服务和导出远程服务。如果scope配置为none，则表示不需要导出服务；如果`scope != remote`表示导出本地服务；如果`scope != local`表示导出远程服务。导出本地服务和远程服务两种都类似，都是先获取Invoker，然后导出成Exporter缓存起来。接下来我们详细看下这两部分内容。
+
+## 导出本地服务
+
+导出本地服务暂先不说了，跟远程类似，可以参考到处远程服务的过程。
+
+## 导出远程服务
+
+我们先看下导出远程服务的相关代码：
+
+```java
+// 获取Invoker
+// proxyFactory是动态生成的代码，其中的getInvoker是调用JavassistProxyFactory(外面还有一层StubProxyFactoryWrapper的包装)的getInvoker方法
+Invoker<?> invoker = proxyFactory.getInvoker(ref, (Class) interfaceClass, registryURL.addParameterAndEncoded(Constants.EXPORT_KEY, url.toFullString()));
+// 根据协议将invoker暴露成exporter
+// 暴露封装服务的invoker
+Exporter<?> exporter = protocol.export(invoker);
+exporters.add(exporter);
+```
+
+这部分简要步骤如下：
+
+- 先获取Invoker，Invoker的重要性可以参考dubbo的文档。
+- 然后导出成Exporter。
+
+### 获取Invoker
+
+先使用ProxyFactory获取Invoker，proxyFactory的来源如下：
+
+```java
+private static final ProxyFactory proxyFactory = ExtensionLoader.getExtensionLoader(ProxyFactory.class).getAdaptiveExtension();
+```
+
+获取了ProxyFactory的自适应实现，如果没有配置的话，默认是使用JavassistProxyFactory。proxyFactory是SPI机制生成的代码，代码如下：
+
+```java
+package com.alibaba.dubbo.rpc;
+
+import com.alibaba.dubbo.common.extension.ExtensionLoader;
+
+public class ProxyFactory$Adpative implements com.alibaba.dubbo.rpc.ProxyFactory {
+    public com.alibaba.dubbo.rpc.Invoker getInvoker(java.lang.Object arg0, java.lang.Class arg1, com.alibaba.dubbo.common.URL arg2) throws java.lang.Object {
+        if (arg2 == null) throw new IllegalArgumentException("url == null");
+        com.alibaba.dubbo.common.URL url = arg2;
+        String extName = url.getParameter("proxy", "javassist");
+        if (extName == null)
+            throw new IllegalStateException("Fail to get extension(com.alibaba.dubbo.rpc.ProxyFactory) name from url(" + url.toString() + ") use keys([proxy])");
+        com.alibaba.dubbo.rpc.ProxyFactory extension = (com.alibaba.dubbo.rpc.ProxyFactory) ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.rpc.ProxyFactory.class).getExtension(extName);
+        return extension.getInvoker(arg0, arg1, arg2);
+    }
+
+    public java.lang.Object getProxy(com.alibaba.dubbo.rpc.Invoker arg0) throws com.alibaba.dubbo.rpc.Invoker {
+        if (arg0 == null) throw new IllegalArgumentException("com.alibaba.dubbo.rpc.Invoker argument == null");
+        if (arg0.getUrl() == null)
+            throw new IllegalArgumentException("com.alibaba.dubbo.rpc.Invoker argument getUrl() == null");
+        com.alibaba.dubbo.common.URL url = arg0.getUrl();
+        String extName = url.getParameter("proxy", "javassist");
+        if (extName == null)
+            throw new IllegalStateException("Fail to get extension(com.alibaba.dubbo.rpc.ProxyFactory) name from url(" + url.toString() + ") use keys([proxy])");
+        com.alibaba.dubbo.rpc.ProxyFactory extension = (com.alibaba.dubbo.rpc.ProxyFactory) ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.rpc.ProxyFactory.class).getExtension(extName);
+        return extension.getProxy(arg0);
+    }
+},
+```
+
+从上面代码可以看到，如果我们没有配置proxy的话，默认使用javassist，也就是JavassistProxyFactory。我们去JavassistProxyFactory中看下getInvoker的代码：
+
+```java
+public <T> Invoker<T> getInvoker(T proxy, Class<T> type, URL url) {
+        // TODO Wrapper类不能正确处理带$的类名
+        /**
+         * 第一步封装一个Wrapper类
+         * 该类是手动生成的
+         * 如果类是以$开头，就使用接口类型获取，其他的使用实现类获取
+         */
+        final Wrapper wrapper = Wrapper.getWrapper(proxy.getClass().getName().indexOf('$') < 0 ? proxy.getClass() : type);
+        return new AbstractProxyInvoker<T>(proxy, type, url) {
+            @Override
+            protected Object doInvoke(T proxy, String methodName, 
+                                      Class<?>[] parameterTypes, 
+                                      Object[] arguments) throws Throwable {
+                return wrapper.invokeMethod(proxy, methodName, parameterTypes, arguments);
+            }
+        };
+    }
+```
+
+我们先看下getInvoker方法的参数：
+
+- T proxy 代表服务的实现类，也就是我们示例中的`me.cxis.dubbo.service.impl.HelloServiceImpl`。
+- Class<T> type 代表服务的接口，也就是示例中的`me.cxis.dubbo.service.HelloService`。
+- URL就是上面生成的url实例。
+
+getInvoker第一步先获取一个Wrapper。关于这个Wrapper是什么，详细的代码不做介绍，就是相当于生成我们需要的服务的代理类，生成的代码如下：
+
+```
+public class Wrapper1 extends Wrapper {
+    public static String[] pns;
+    public static Map pts;
+    public static String[] mns; // all method name array.
+    public static String[] dmns;
+    public static Class[] mts0;
+
+    public String[] getPropertyNames() {
+        return pns;
+    }
+
+    public boolean hasProperty(String n) {
+        return pts.containsKey($1);
+    }
+
+    public Class getPropertyType(String n) {
+        return (Class) pts.get($1);
+    }
+
+    public String[] getMethodNames() {
+        return mns;
+    }
+
+    public String[] getDeclaredMethodNames() {
+        return dmns;
+    }
+
+    public void setPropertyValue(Object o, String n, Object v) {
+        dubbo.provider.hello.service.impl.HelloServiceImpl w;
+        try {
+            w = ((dubbo.provider.hello.service.impl.HelloServiceImpl) $1);
+        } catch (Throwable e) {
+            throw new IllegalArgumentException(e);
+        }
+        throw new com.alibaba.dubbo.common.bytecode.NoSuchPropertyException("Not found property \"" + $2 + "\" filed or setter method in class dubbo.provider.hello.service.impl.HelloServiceImpl.");
+    }
+
+    public Object getPropertyValue(Object o, String n) {
+        dubbo.provider.hello.service.impl.HelloServiceImpl w;
+        try {
+            w = ((dubbo.provider.hello.service.impl.HelloServiceImpl) $1);
+        } catch (Throwable e) {
+            throw new IllegalArgumentException(e);
+        }
+        throw new com.alibaba.dubbo.common.bytecode.NoSuchPropertyException("Not found property \"" + $2 + "\" filed or setter method in class dubbo.provider.hello.service.impl.HelloServiceImpl.");
+    }
+
+    public Object invokeMethod(Object o, String n, Class[] p, Object[] v) throws java.lang.reflect.InvocationTargetException {
+        dubbo.provider.hello.service.impl.HelloServiceImpl w;
+        try {
+            w = ((dubbo.provider.hello.service.impl.HelloServiceImpl) $1);
+        } catch (Throwable e) {
+            throw new IllegalArgumentException(e);
+        }
+        try {
+            if ("sayHello".equals($2) && $3.length == 0) {
+                w.sayHello();
+                return null;
+            }
+        } catch (Throwable e) {
+            throw new java.lang.reflect.InvocationTargetException(e);
+        }
+        throw new com.alibaba.dubbo.common.bytecode.NoSuchMethodException("Not found method \"" + $2 + "\" in class dubbo.provider.hello.service.impl.HelloServiceImpl.");
+    }
+}
+```
+
+可以看到我们的服务的方法在这个生成的类的逻辑里面，接下来继续看代码，下一步就是直接返回一个匿名对像Invoker，并且继承了AbstractProxyInvoker，该对象的doInvoke方法直接将调用委托给了上面我们生成的Wrapper1的invokeMethod方法。
+
+我们可以大胆猜想一下，我们导出的服务是怎么被调用的，调用服务的请求到达服务提供方这里，先经过一系列的转换操作，最后变成了一个Invoker，这个Invoker调用AbstractProxyInvoker的invoke方法，该方法中就会调用我们这边这个匿名对象Invoker的doInvoke方法，doInvoke方法又会调用生成的Wrapper1的invokeMethod方法，该方法中就有我们服务的实现类的相关方法，就可以得到结果了，然后返回。
+
+这样就可以理解为什么说Invoker代表一个可执行体，因为他就是要执行我们真实逻辑的执行体。
+
+### 将Invoker导出
+
+上面获取Invoker方法之后，就相当于生成了一个代理类，对我们接口的请求，就委托给了Wrapper进行处理。生成Invoker之后，接下来就是要将这个Invoker进行导出了：
+
+```
+Exporter<?> exporter = protocol.export(invoker);
+```
+
+protocol也是自适应的实现，具体生成的自适应代码可以参考SPI那篇文章，这里不再贴出。我们示例中使用的protocol是dubbo，所以这里protocol是DubboProtocol对象。接下来就可以看下DubboProtocol中export方法的实现了：
+
+```java
+
+```
 
