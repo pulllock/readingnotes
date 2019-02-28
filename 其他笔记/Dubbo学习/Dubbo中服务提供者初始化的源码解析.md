@@ -957,4 +957,223 @@ final URL registedProviderUrl = getRegistedProviderUrl(originInvoker);
 registry.register(registedProviderUrl);
 ```
 
-注册服务，就是要将服务注册到注册中心，比如我们使用的zookeeper，方便服务治理。步骤上面代码中都有。
+注册服务，就是要将服务注册到注册中心，比如我们使用的zookeeper，方便服务治理。步骤上面代码中都有。第一步是先获取Registry的实现类，getRegistry的代码如下：
+
+```java
+private Registry getRegistry(final Invoker<?> originInvoker){
+    // 获取registryUrl，就是以registry://开头的
+    URL registryUrl = originInvoker.getUrl();
+    // 获取url中的registry属性，我们这里用的是zookeeper
+    if (Constants.REGISTRY_PROTOCOL.equals(registryUrl.getProtocol())) {
+        String protocol = registryUrl.getParameter(Constants.REGISTRY_KEY, Constants.DEFAULT_DIRECTORY);
+        registryUrl = registryUrl.setProtocol(protocol).removeParameter(Constants.REGISTRY_KEY);
+    }
+    // registryFactory也是spi生成的代码，这里最后获得是ZookeeperRegistry
+    return registryFactory.getRegistry(registryUrl);
+}
+```
+
+由于我们配置的注册中心是zookeeper，所以这里最终获得的是ZookeeperRegistry。我们看下registryFactory是怎么来的，可以翻到此类的最上面发现如下代码：
+
+```java
+private RegistryFactory registryFactory;
+    
+public void setRegistryFactory(RegistryFactory registryFactory) {
+    this.registryFactory = registryFactory;
+}
+```
+
+在spi的源码解析时候说过，registryFactory在获取Protocol的实现类RegistryProtocol时会注入依赖的其他SPI，所以这里registryFactory的代码生成如下：
+
+```java
+package com.alibaba.dubbo.registry;
+
+import com.alibaba.dubbo.common.extension.ExtensionLoader;
+
+public class RegistryFactory$Adpative implements com.alibaba.dubbo.registry.RegistryFactory {
+    public com.alibaba.dubbo.registry.Registry getRegistry(com.alibaba.dubbo.common.URL arg0) {
+        if (arg0 == null) throw new IllegalArgumentException("url == null");
+        com.alibaba.dubbo.common.URL url = arg0;
+        String extName = (url.getProtocol() == null ? "dubbo" : url.getProtocol());
+        if (extName == null)
+            throw new IllegalStateException("Fail to get extension(com.alibaba.dubbo.registry.RegistryFactory) name from url(" + url.toString() + ") use keys([protocol])");
+        com.alibaba.dubbo.registry.RegistryFactory extension = (com.alibaba.dubbo.registry.RegistryFactory) ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.registry.RegistryFactory.class).getExtension(extName);
+        return extension.getRegistry(arg0);
+    }
+}
+```
+
+这里获得了ZookeeperRegistryFactory后，ZookeeperRegistry继承了AbstractRegistryFactory，我们看下AbstractRegistryFactory的getRegistry的方法：
+
+```java
+public Registry getRegistry(URL url) {
+    url = url.setPath(RegistryService.class.getName())
+        .addParameter(Constants.INTERFACE_KEY, RegistryService.class.getName())
+        .removeParameters(Constants.EXPORT_KEY, Constants.REFER_KEY);
+    String key = url.toServiceString();
+    // 锁定注册中心获取过程，保证注册中心单一实例
+    LOCK.lock();
+    try {
+        // 先从缓存中获取
+        Registry registry = REGISTRIES.get(key);
+        if (registry != null) {
+            return registry;
+        }
+        // 创建注册中心，具体子类实现
+        registry = createRegistry(url);
+        if (registry == null) {
+            throw new IllegalStateException("Can not create registry " + url);
+        }
+        REGISTRIES.put(key, registry);
+        return registry;
+    } finally {
+        // 释放锁
+        LOCK.unlock();
+    }
+}
+```
+
+创建注册中心是在ZookeeperRegistryFactory中实现，其实就是实例化一个ZookeeperRegistry：
+
+```java
+public Registry createRegistry(URL url) {
+    return new ZookeeperRegistry(url, zookeeperTransporter);
+}
+```
+
+我们继续看看ZookeeperRegistry实例化都做了什么，ZookeeperRegistry继承了FailbackRegistry，FailbackRegistry继承了AbstractRegistry，关于AbstractRegistry和FailbackRegistry的构造方法不再深入看，主要是处理从用户主目录读取缓存以及失败重试的操作。我们还是关注主流程，看ZookeeperRegistry的构造方法：
+
+```java
+public ZookeeperRegistry(URL url, ZookeeperTransporter zookeeperTransporter) {
+    super(url);
+    if (url.isAnyHost()) {
+        throw new IllegalStateException("registry address == null");
+    }
+    String group = url.getParameter(Constants.GROUP_KEY, DEFAULT_ROOT);
+    if (! group.startsWith(Constants.PATH_SEPARATOR)) {
+        group = Constants.PATH_SEPARATOR + group;
+    }
+    this.root = group;
+    // 创建zookeeper的客户端
+    zkClient = zookeeperTransporter.connect(url);
+    // 添加状态监听器
+    zkClient.addStateListener(new StateListener() {
+        public void stateChanged(int state) {
+            if (state == RECONNECTED) {
+                try {
+                    recover();
+                } catch (Exception e) {
+                    logger.error(e.getMessage(), e);
+                }
+            }
+        }
+    });
+}
+```
+
+这里就是创建zookeeper的客户端，并添加监听器。zookeeperTransporter是ZookeeperRegistryFactory中注入的自适应扩展：
+
+```java
+package com.alibaba.dubbo.remoting.zookeeper;
+
+import com.alibaba.dubbo.common.extension.ExtensionLoader;
+
+public class ZookeeperTransporter$Adpative implements com.alibaba.dubbo.remoting.zookeeper.ZookeeperTransporter {
+    public com.alibaba.dubbo.remoting.zookeeper.ZookeeperClient connect(com.alibaba.dubbo.common.URL arg0) {
+        if (arg0 == null) throw new IllegalArgumentException("url == null");
+        com.alibaba.dubbo.common.URL url = arg0;
+        String extName = url.getParameter("client", url.getParameter("transporter", "zkclient"));
+        if (extName == null)
+            throw new IllegalStateException("Fail to get extension(com.alibaba.dubbo.remoting.zookeeper.ZookeeperTransporter) name from url(" + url.toString() + ") use keys([client, transporter])");
+        com.alibaba.dubbo.remoting.zookeeper.ZookeeperTransporter extension = (com.alibaba.dubbo.remoting.zookeeper.ZookeeperTransporter) ExtensionLoader.getExtensionLoader(com.alibaba.dubbo.remoting.zookeeper.ZookeeperTransporter.class).getExtension(extName);
+        return extension.connect(arg0);
+    }
+}
+```
+
+我们并没有配置transporter属性，所以这里默认使用的是zkclient实现ZkclientZookeeperTransporter，这里就是创建zkClient实例，订阅状态相关的监听器等等，具体代码不再列出。
+
+注册中心ZookeeperRegistry创建完成，继续下一步获取注册的服务提供者的URL，就是`dubbo://`开头的服务提供者URL，获取到这个URL后，就开始真正的注册服务操作了`registry.register(registedProviderUrl);`。
+
+由ZookeeperRegistry继承了FailbackRegistry，FailbackRegistry又继承了AbstractRegistry，调用会先进入FailbackRegistry的register方法，该方法又直接调用AbstractRegistry的register方法，我们从上往下看，先看AbstractRegistry：
+
+```java
+public void register(URL url) {
+    if (url == null) {
+        throw new IllegalArgumentException("register url == null");
+    }
+    if (logger.isInfoEnabled()){
+        logger.info("Register: " + url);
+    }
+    registered.add(url);
+}
+```
+
+做了简单的校验，加入到一个已注册的Set中。继续看FailbackRegistry的方法：
+
+```java
+public void register(URL url) {
+    // 先调用父类的方法
+    super.register(url);
+    // 注册失败的Set中移除
+    failedRegistered.remove(url);
+    // 取消注册失败的Set中移除
+    failedUnregistered.remove(url);
+    try {
+        // 向服务器端发送注册请求
+        doRegister(url);
+    } catch (Exception e) {
+        Throwable t = e;
+
+        // 如果开启了启动时检测，则直接抛出异常
+        boolean check = getUrl().getParameter(Constants.CHECK_KEY, true)
+            && url.getParameter(Constants.CHECK_KEY, true)
+            && ! Constants.CONSUMER_PROTOCOL.equals(url.getProtocol());
+        boolean skipFailback = t instanceof SkipFailbackWrapperException;
+        if (check || skipFailback) {
+            if(skipFailback) {
+                t = t.getCause();
+            }
+            throw new IllegalStateException("Failed to register " + url + " to registry " + getUrl().getAddress() + ", cause: " + t.getMessage(), t);
+        } else {
+            logger.error("Failed to register " + url + ", waiting for retry, cause: " + t.getMessage(), t);
+        }
+
+        // 将失败的注册请求记录到失败列表，定时重试
+        failedRegistered.add(url);
+    }
+}
+```
+
+我们开始注册服务，所以先从注册失败和取消注册失败的Set中将我们要注册的服务移除，然后开始向注册中心注册服务。doRegister方法又具体的子类实现，我们这里是ZookeeperRegistry实现：
+
+```java
+protected void doRegister(URL url) {
+    try {
+        zkClient.create(toUrlPath(url), url.getParameter(Constants.DYNAMIC_KEY, true));
+    } catch (Throwable e) {
+        throw new RpcException("Failed to register " + url + " to zookeeper " + getUrl() + ", cause: " + e.getMessage(), e);
+    }
+}
+```
+
+其实就是调用zkclient创建zookeeper结点，结点类似`/dubbo/me.cxis.dubbo.service.HelloService/providers/xxxxx`这种结构。创建完结点后，就相当于服务祖册完成了。接下来是订阅override数据，还没有弄明白，暂先不说了。
+
+有关zookeeper作为注册中心的说明可以参考dubbo的文档：[zookeeper 注册中心](https://dubbo.incubator.apache.org/zh-cn/docs/user/references/registry/zookeeper.html)，摘取部分内容：
+
+- 服务提供者启动时: 向 `/dubbo/com.foo.BarService/providers` 目录下写入自己的 URL 地址
+- 服务消费者启动时: 订阅 `/dubbo/com.foo.BarService/providers` 目录下的提供者 URL 地址。并向 `/dubbo/com.foo.BarService/consumers` 目录下写入自己的 URL 地址
+- 监控中心启动时: 订阅 `/dubbo/com.foo.BarService` 目录下的所有提供者和消费者 URL 地址。
+
+到此服务提供者初始化的流程就结束了，这里再总结写大概的流程：
+
+- Spring容器遇到dubbo的service标签，调用DubboBeanDefinitionParser解析标签。
+- dubbo的bean实例化后，根据时机在afterPropertiesSet或者onApplicationEvent方法中选择开始暴露服务。
+- 加载注册中心URL，循环挨个导出服务。
+- 导出服务分为导出本地服务和导出远程服务。
+- 导出服务时首先获取一个Invoker，Invoker中包含了对实际实现方法的调用。
+- 将Invoker进行导出，分为导出服务和注册服务两个主要的步骤。
+- 导出服务主要是启动Netty服务器导出，并将Invoker导出成Exporter。
+- 注册服务分为获取注册中心和导出服务。
+- 获取注册中心是获取ZookeeperRegistry，导出服务是将结点写到zookeeper中。
+- 最后订阅override数据监听器，完成服务暴露。
