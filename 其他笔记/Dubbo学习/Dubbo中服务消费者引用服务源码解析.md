@@ -301,7 +301,164 @@ public <T> Invoker<T> join(Directory<T> directory) throws RpcException {
 
 ## 创建代理
 
-上面创建了Invoker之后，就接着来到`return (T) proxyFactory.getProxy(invoker)`这一步进行代理的创建了。
+上面创建了Invoker之后，就接着来到`return (T) proxyFactory.getProxy(invoker)`这一步进行代理的创建了。proxyFactory是自适应的ProxyFactory实现，并且我们没有配置，默认使用JavassistProxyFactory，并且外面有一层StubProxyFactoryWrapper包装。我们先看JavassistProxyFactory的getProxy方法：
 
+```java
+public <T> T getProxy(Invoker<T> invoker, Class<?>[] interfaces) {
+    return (T) Proxy.getProxy(interfaces).newInstance(new InvokerInvocationHandler(invoker));
+}
+```
 
+这里Proxy.getProxy是dubbo自己实现的，然后进newInstance创建代理实例。具体的方法还没进行分析。创建完代理返回后就算流程结束了。
 
+上面只是创建Invoker和代理的过程，引用服务的过程还没有看到，接下来就看看服务引用的过程。
+
+# 服务引用
+
+服务引用，我们这里说的是dubbo协议的，所以需要分析DubboProtocol的refer方法：
+
+```java
+public <T> Invoker<T> refer(Class<T> serviceType, URL url) throws RpcException {
+    // create rpc invoker.
+    /**
+         * 创建DubboInvoker实例
+         * 先调用getClients方法服务连接
+         * 
+         * serviceType是接口，比如me.cxis.dubbo.service.HelloService
+         * url就是dubbo://的url
+         * invokers就是Invoker的一个Set
+         */
+    DubboInvoker<T> invoker = new DubboInvoker<T>(serviceType, url, getClients(url), invokers);
+    invokers.add(invoker);
+    return invoker;
+}
+```
+
+继续getClients：
+
+```java
+private ExchangeClient[] getClients(URL url){
+    // 是否共享连接
+    boolean service_share_connect = false;
+    int connections = url.getParameter(Constants.CONNECTIONS_KEY, 0);
+    // 如果connections不配置，则共享连接，否则每服务每连接
+    if (connections == 0){
+        service_share_connect = true;
+        connections = 1;
+    }
+
+    ExchangeClient[] clients = new ExchangeClient[connections];
+    for (int i = 0; i < clients.length; i++) {
+        if (service_share_connect){
+            clients[i] = getSharedClient(url);
+        } else {
+            clients[i] = initClient(url);
+        }
+    }
+    return clients;
+}
+```
+
+我们没有配置connections，则使用共享连接，getSharedCliet：
+
+```java
+private ExchangeClient getSharedClient(URL url){
+    // xxx.xxx.xxx.xxx:20080
+    String key = url.getAddress();
+    // 引用的Client缓存
+    ReferenceCountExchangeClient client = referenceClientMap.get(key);
+    if ( client != null ){
+        if ( !client.isClosed()){
+            client.incrementAndGetCount();
+            return client;
+        } else {
+            //                logger.warn(new IllegalStateException("client is closed,but stay in clientmap .client :"+ client));
+            referenceClientMap.remove(key);
+        }
+    }
+    // 创建新连接
+    ExchangeClient exchagneclient = initClient(url);
+
+    // 将新连接封装一下，返回
+    client = new ReferenceCountExchangeClient(exchagneclient, ghostClientMap);
+    referenceClientMap.put(key, client);
+    ghostClientMap.remove(key);
+    return client; 
+}
+```
+
+创建新连接代码：
+
+```java
+private ExchangeClient initClient(URL url) {
+        
+    // client type setting.
+    // 默认netty
+    String str = url.getParameter(Constants.CLIENT_KEY, url.getParameter(Constants.SERVER_KEY, Constants.DEFAULT_REMOTING_CLIENT));
+
+    // dubbo版本
+    String version = url.getParameter(Constants.DUBBO_VERSION_KEY);
+    boolean compatible = (version != null && version.startsWith("1.0."));
+    url = url.addParameter(Constants.CODEC_KEY, Version.isCompatibleVersion() && compatible ? COMPATIBLE_CODEC_NAME : DubboCodec.NAME);
+    //默认开启heartbeat
+    url = url.addParameterIfAbsent(Constants.HEARTBEAT_KEY, String.valueOf(Constants.DEFAULT_HEARTBEAT));
+
+    // BIO存在严重性能问题，暂时不允许使用
+    if (str != null && str.length() > 0 && ! ExtensionLoader.getExtensionLoader(Transporter.class).hasExtension(str)) {
+        throw new RpcException("Unsupported client type: " + str + "," +
+                               " supported client type is " + StringUtils.join(ExtensionLoader.getExtensionLoader(Transporter.class).getSupportedExtensions(), " "));
+    }
+
+    ExchangeClient client ;
+    try {
+        //设置连接应该是lazy的 
+        if (url.getParameter(Constants.LAZY_CONNECT_KEY, false)){
+            client = new LazyConnectExchangeClient(url ,requestHandler);
+        } else {
+            // 连接client
+            client = Exchangers.connect(url ,requestHandler);
+        }
+    } catch (RemotingException e) {
+        throw new RpcException("Fail to create remoting client for service(" + url
+                               + "): " + e.getMessage(), e);
+    }
+    return client;
+}
+```
+
+`Exchangers.connect()`开始连接服务，继续看代码：
+
+```java
+public static ExchangeClient connect(URL url, ExchangeHandler handler) throws RemotingException {
+    if (url == null) {
+        throw new IllegalArgumentException("url == null");
+    }
+    if (handler == null) {
+        throw new IllegalArgumentException("handler == null");
+    }
+    url = url.addParameterIfAbsent(Constants.CODEC_KEY, "exchange");
+    return getExchanger(url).connect(url, handler);
+}
+```
+
+这里getExchanger获取到的是默认的HeaderExchanger，到connect中看下：
+
+```java
+public ExchangeClient connect(URL url, ExchangeHandler handler) throws RemotingException {
+    return new HeaderExchangeClient(Transporters.connect(url, new DecodeHandler(new HeaderExchangeHandler(handler))));
+}
+```
+
+这里面先实例化一个HeaderExchangeHandler，然后实例化一个DecodeHandler，再调用Transporters的connect方法，最后实例化成一个HeaderExchangeClient返回。
+
+其实这面往下就跟服务提供者导出服务差不多了，实例化NettyClient，连接之类的。
+
+DubboProtocol外面还包装着ProtocolListenerWrapper和ProtocolFilterWrapper两个类，DubboProtocol的refer成功后，就会经过这两个包装类的处理，这两个在服务提供者那里也说过，不在多说。
+
+我们来简单说下服务提供者引用服务的过程：
+
+- Spring容器遇到dubbo的service标签，调用DubboBeanDefinitionParser解析标签。
+- dubbo的bean实例化后，根据时机在afterPropertiesSet或者在getBean的时候开始引用。
+- 创建Invoker实例。
+- 创建代理类。
+- 同时也创建NettyClient建立连接。
