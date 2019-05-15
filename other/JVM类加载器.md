@@ -39,5 +39,5 @@ JVM类加载器有三种：
 ## 打破双亲委派模型的例子
 
 - 使用SPI加载的，如JNDI、JDBC、JCE、JAXB、JBI等等，使用线程上下文类加载器来加载第三方厂商的类。
-- tomcat中的web容器类加载器也打破了双亲委派模型，自定义的WebApplicationClassLoader除了核心类库外，都优先加载自己路径下的类。
+- tomcat中的web容器类加载器也打破了双亲委派模型，自定义的WebClassLoader除了核心类库外，都优先加载自己路径下的类，加载不到时再交给CommonClassLoader进行双亲委派机制加载。
 - OSGI也打破了双亲委派模型，OSGI是网状结构的。
