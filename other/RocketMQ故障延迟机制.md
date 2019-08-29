@@ -1,0 +1,20 @@
+# RocketMQ故障延迟机制
+
+如果RocketMQ发送消息时，broker出现了故障，则这次发送消息就会失败。为了保证消息能成功发送，，RocketMQ会采用重试机制和broker故障延迟机制来保证高可用。
+
+broker故障延迟使用sendLatencyFaultEnable字段来控制，默认是false不开启故障延迟机制。
+
+## 默认不开启故障延迟机制
+
+如果不开启故障延迟机制，在重试选择发送队列的时候会现根据线程的ThreadLocal中的自增值来从messageQueueList中选择一个队列，并且比较下是不是上一次失败的broker，如果是上一次失败的就跳过继续获取下一个队列；如果不是就返回找到的队列。
+
+## 开启故障延迟机制
+
+开启了故障延迟机制后会相对复杂一些，第一步也是根据线程ThreadLocal中自增值来从messageQueueList中选择一个队列，然后不是比较是不是上一次失败的broker，而是使用latencyFaultTolerance的isAvailable方法判断是否可用，并返回队列。
+
+重点在isAvailable这个方法，它是怎么可以判断是否可用的？跟进去看代码，最后可以看到只是判断了：当前时间是否大于或等于startTimestamp。startTimestamp这个值的来源是从正常发送完消息或者异常之后的一些操作中计算来的。
+
+在正常发送完消息或者异常之后，都会调用updateFaultItem方法，进入该方法可以看到，如果启用了broker故障延迟机制，也就是需要对broker进行规避，则先计算规避的时长，默认消息发送延迟时间是30秒，默认规避时长是10分钟。这个10分钟不是固定的，而是根据发送延迟时间来进行计算的。
+
+在得到了规避时长之后，就会根据当前时间加上规避时长计算出startTimestamp，上面就可以根据这个来判断broker是否可用。
+
