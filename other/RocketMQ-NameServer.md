@@ -1,0 +1,35 @@
+# NameServer作用
+
+- 存储路由元信息
+- 路由注册
+- 路由删除
+- 路由发现
+
+# 路由信息
+
+- topicQueueTable，Topic消息队列路由信息，消息发送时根据路由表进行负载均衡。
+- brokerAddrTable，Broker基础信息，包含brokerName、所属集群名称、主备Broker地址。
+- clusterAddrTable，Broker集群信息，存储集群中所有Broker名称。
+- brokerLiveTable，Broker状态信息，NameServer每次收到心跳包时会替换该信息。
+- filterServerTable，Broker上的FilterServer列表，用于类模式消息过滤。
+
+# 路由注册
+
+路由注册是通过Broker与NameServer的心跳功能实现的。Broker启动时会向集群中所有的NameServer发送心跳包，启动后每隔30秒向集群中所有的NameServer发送心跳包。NameServer收到Broker的心跳包时，会更新brokerLiveTable缓存中BrokerLiveInfo的lastUpdateTimestamp，同时NameServer每隔10秒扫描brokerLiveTable，如果连续120秒没有收到心跳包，NameServer就将移除该Broker的路由信息，同时管理Socket连接。
+
+NameServer与Broker保持长连接，Broker状态存储在brokerLiveTable中，NameServer每收到一个心跳包，将更新brokerLiveTable中关于Broker的状态信息以及路由表（topicQueueTable、brokerAddrTable、brokerLiveTable、filterServerTable）。
+
+# 路由删除
+
+Broker每隔30秒会向NameServer发送一个心跳包，NameServer每隔10秒会扫描brokerLiveTable状态表，如果BrokerLive的lastUpdateTimestamp的时间间隔超过120秒，就会认为Broker失效，会移除该Broker、关闭与Broker的连接，同时更新topicQueueTable、brokerAddrTable、brokerLiveTable、filterServerTable等。
+
+# 路由发现
+
+RocketMQ的路由发现不是实时的，当Topic路由出现变化后，NameServer不主动推送给客户端，而是由可数端定时拉取主题最新的路由。
+
+# 总结
+
+1. NameServer收到Broker心跳包后，会更新brokerLi中的信息，记录心跳时间lastUpdateTime。
+2. Broker每隔30秒会报告自己还活着。
+3. NameServer每隔10秒扫描brokerLiveTable，检测表中上次收到心跳包的时间，比较当前时间与上一次时间，如果超过120秒，则认为broker不可用，从路由表中将该broker相关信息移除。
+4. Producer会根据topic到NameServer中查询路由信息。
