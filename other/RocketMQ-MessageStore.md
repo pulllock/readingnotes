@@ -7,6 +7,29 @@ RocketMQ主要存储的文件包括CommitLog文件、ConsumeQueue文件、IndexF
 - 事务状态服务：存储每条消息的事务状态。
 - 定时消息服务：每一个延迟级别对应一个消息消费队列，存储延迟队列的消息拉取进度。
 
+## 一些类说明
+CommitLog : MappedFileQueue : MappedFile = 1 : 1 : N
+
+- MappedFile 是硬盘上一个个文件的映射
+- MappedFileQueue是MappedFile所在的文件夹，将MappedFile封装成文件队列，对上层提供可无限使用的文件容量
+- CommitLog 针对MappedFileQueue的封装使用
+
+CommitLog目前存储在MappedFile有两种类型：
+
+1. MESSAGE：消息
+2. BLANK：文件不足以存储消息时的空白占位
+
+CommitLog存储在MappedFile的结构：
+
+```
+-----------------------------------------------------
+| MESSAGE[1] | MESSAGE[2] | ... | MESSAGE[N] | BLANK|
+-----------------------------------------------------
+```
+
+
+
+
 ## RocketMQ存储文件
 
 存储路径为`${ROCKET_HOME/store}`，存储的目录和文件有：
