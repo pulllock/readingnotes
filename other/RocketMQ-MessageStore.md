@@ -1,3 +1,8 @@
+# 高性能存储
+- 支持顺序写的消息存储结构 
+- MappedFile 创建、异步线程结合 CountDownLatch 实现任务执行的异步转同步
+- 堆外内存
+- MappedFile 内存预热和JNA内存锁定
 # RocketMQ 消息存储
 RocketMQ主要存储的文件包括CommitLog文件、ConsumeQueue文件、IndexFile文件。
 
