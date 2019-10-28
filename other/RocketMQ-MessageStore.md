@@ -3,6 +3,18 @@
 - MappedFile 创建、异步线程结合 CountDownLatch 实现任务执行的异步转同步
 - 堆外内存
 - MappedFile 内存预热和JNA内存锁定
+# MappedFile
+
+TransientStorePool与MappedFile在数据处理上的差异在什么地方呢？分析其代码，TransientStorePool会通过ByteBuffer.allocateDirect调用直接申请对外内存，消息数据在写入内存的时候是写入预申请的内存中。在异步刷盘的时候，再由刷盘线程将这些内存中的修改写入文件。
+
+那么与直接使用MappedByteBuffer相比差别在什么地方呢？修改MappedByteBuffer实际会将数据写入文件对应的Page Cache中，而TransientStorePool方案下写入的则为纯粹的内存。因此在消息写入操作上会更快，因此能更少的占用CommitLog.putMessageLock锁，从而能够提升消息处理量。使用TransientStorePool方案的缺陷主要在于在异常崩溃的情况下回丢失更多的消息。
+
+http://soliloquize.org/2018/08/25/RocketMQ-CommitLog%E5%88%B7%E7%9B%98%E6%9C%BA%E5%88%B6/
+
+# TransientStorePool
+
+开启TransientStorePool后，master写入变成 先写堆外内存 ，然后批量commit到 FileChannel写入，而主从同步判断能同步到的消息是已经commit到FileChannel的消息，而消息由堆外内存commit到PageCache是有一定频率的，是受commitIntervalCommitLog，commitCommitLogThoroughInterval两个参数影响，默认值是200ms，所以你能看到消息大体都落在100ms-200ms之间。
+
 # RocketMQ 消息存储
 RocketMQ主要存储的文件包括CommitLog文件、ConsumeQueue文件、IndexFile文件。
 
