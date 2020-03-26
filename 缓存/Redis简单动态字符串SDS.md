@@ -17,13 +17,13 @@ struct sdshdr{
 }
  ```
 
-![SDS-1](Redis简单动态字符串SDS\SDS-1.png)
+![SDS-1](Redis简单动态字符串SDS/SDS-1.png)
 
 1. free=0，表示SDS没有分配未使用空间
 2. len=5，表示SDS保存了一个5字节长的字符串
 3. buf是一个char类型数组，前面5个保存了实际的字符，最后一个字节保存了空字符`\0`
 
-![SDS-2](Redis简单动态字符串SDS\SDS-2.png)
+![SDS-2](Redis简单动态字符串SDS/SDS-2.png)
 
 1. free=5，表示为buf数组分配了5字节未使用空间
 

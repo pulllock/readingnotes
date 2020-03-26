@@ -4,7 +4,7 @@ Redis字典使用哈希表作为底层实现，一个哈希表可以有多个哈
 
 哈希表：
 
-![hashtable-1](Redis简单动态字符串SDS\hashtable-1.png)
+![hashtable-1](Redis字典/hashtable-1.png)
 
 哈希表就类似Java中的Map实现。
 
@@ -23,7 +23,7 @@ Redis字典使用哈希表作为底层实现，一个哈希表可以有多个哈
 
 字典：
 
-![dict-1](Redis简单动态字符串SDS\dict-1.png)
+![dict-1](Redis字典/dict-1.png)
 
 1. type，指向一个dictType结构指针，为不同字典设置不同类型特定函数。
 2. privdata，保存了需要传给那些类型特定函数的可选参数
