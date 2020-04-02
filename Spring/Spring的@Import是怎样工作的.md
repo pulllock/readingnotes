@@ -4,7 +4,7 @@ Spring提供了JavaConfig配置的方式，可以将原来的xml配置文件使�
 
 @Import注解有四种使用方法：
 
-1. @Import导入普通类
+1. @Import导入普通类（Spring4.2之后支持）
 2. @Import导入@Configuration注解的类
 3. @Import导入ImportBeanDefinitionRegistrar的实现类
 4. @Import导入ImportSelector的实现类
