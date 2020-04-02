@@ -33,7 +33,7 @@ ConfigurationClassParser的processImport方法：
 
 ```java
 ...
-    // ImportSelector的处理，会实例化我们自定义的实现类ImportSelector接口的类 ，然后调用ImportSelector的selectImport方法获取我们要处理Bean
+    // ImportSelector的处理，会实例化我们自定义的实现类ImportSelector接口的类 ，然后调用ImportSelector的selectImports方法获取我们要处理Bean
 if (checkAssignability(ImportSelector.class, candidateToCheck)) {
     // Candidate class is an ImportSelector -> delegate to it to determine imports
     Class<?> candidateClass = (candidate instanceof Class ? (Class) candidate :
