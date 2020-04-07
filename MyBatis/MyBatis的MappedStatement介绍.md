@@ -1,0 +1,10 @@
+MyBatis中的SqlSession在使用Executor进行具体的操作之前，会先到Configuration中获取一个MappedStatement，MappedStatement是对mapper文件中的select、update、delete、insert等结点的封装。
+
+所有的MappedStatement都保存在Configuration的一个map中：mappedStatements，key是namespace+id，value是MappedStatement对象。SqlSession获取到具体的MappedStatement之后，才可以使用Executor执行具体的操作。
+
+MappedStatement对象中的属性基本上都能和mapper.xml中节点和属性对应起来：
+
+- ParmeterMap，查询参数
+- ResultMap，结果集映射
+
+MappedStatement有个重要的SqlSource，是用来执行动态sql的，就是用来处理像`<if>`之类的标签，处理完后会将信息封装到BoundSql中，这里会带有具体的sql语句和对应的参数信息等。
