@@ -31,3 +31,4 @@
 
 - https://www.infoq.cn/article/EeE1xZeic4UdpbmR*03t
 - https://tech.youzan.com/api-gateway-in-practice/
+- http://www.zhikestreet.com/content/p/22.html
