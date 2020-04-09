@@ -1,5 +1,9 @@
 # 整体架构
 
+使用draw io画的图，这里是源文件：![APIGateway整体架构](APIGateway设计文档/APIGateway整体架构.drawio)
+
+![APIGateway整体架构](APIGateway设计文档/APIGateway整体架构.png)
+
 - 调用方，手机端、接入方等等一系列调用方
 - LVS负载均衡
 - Nginx反向代理
@@ -28,6 +32,10 @@
 - agw_out_api，外部调用方拥有的api
 - agw_out_ip，外部调用方的白名单配置
 - agw_black_ip，黑名单ip
+
+使用draw io画的图，这里是源文件：![APIGateway数据库设计](APIGateway设计文档/APIGateway数据库设计.drawio)
+
+![APIGateway数据库设计](APIGateway设计文档/APIGateway数据库设计.png)
 
 ## agw_api
 
