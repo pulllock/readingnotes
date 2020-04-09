@@ -1,6 +1,6 @@
 # 整体架构
 
-使用draw io画的图，这里是源文件：![APIGateway整体架构](APIGateway设计文档/APIGateway整体架构.drawio)
+使用draw io画的图，这里是源文件：[APIGateway整体架构](APIGateway设计文档/APIGateway整体架构.drawio)
 
 ![APIGateway整体架构](APIGateway设计文档/APIGateway整体架构.png)
 
@@ -33,7 +33,7 @@
 - agw_out_ip，外部调用方的白名单配置
 - agw_black_ip，黑名单ip
 
-使用draw io画的图，这里是源文件：![APIGateway数据库设计](APIGateway设计文档/APIGateway数据库设计.drawio)
+使用draw io画的图，这里是源文件：[APIGateway数据库设计](APIGateway设计文档/APIGateway数据库设计.drawio)
 
 ![APIGateway数据库设计](APIGateway设计文档/APIGateway数据库设计.png)
 

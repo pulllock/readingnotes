@@ -197,3 +197,236 @@ public class ChainController {
 
 # Apache Commons Chain使用
 
+```java
+public class CommonContext extends ContextBase {
+}
+```
+
+```java
+public abstract class AbstractCommand implements Command {
+
+    @Override
+    public boolean execute(Context context) throws Exception {
+        CommonContext commonContext = (CommonContext) context;
+        return execute(commonContext);
+    }
+
+    public abstract boolean execute(CommonContext context);
+}
+```
+
+```java
+public class BlacklistHandler extends AbstractCommand {
+
+    @Override
+    public boolean execute(CommonContext context) {
+        String request = String.valueOf(context.get("request"));
+        if (request.contains("hack")) {
+            context.put("error", "ip locked");
+            return true;
+        }
+        return false;
+    }
+}
+```
+
+```java
+public class FlowControlHandler extends AbstractCommand {
+
+    @Override
+    public boolean execute(CommonContext context) {
+        return false;
+    }
+}
+```
+
+```java
+public class ParamCheckHandler extends AbstractCommand {
+
+    @Override
+    public boolean execute(CommonContext context) {
+        String request = String.valueOf(context.get("request"));
+        if (request.contains("error")) {
+            context.put("error", "param error!");
+            return true;
+        }
+        return false;
+    }
+}
+```
+
+```java
+public class InvokeServiceHandler extends AbstractCommand {
+
+    @Override
+    public boolean execute(CommonContext context) {
+        String request = String.valueOf(context.get("request"));
+
+        String result = "result for request: " + request;
+        context.put("result", result);
+        return false;
+    }
+}
+```
+
+```java
+public class Chains extends ChainBase {
+
+    public Chains() {
+        addCommand(new BlacklistHandler());
+        addCommand(new FlowControlHandler());
+        addCommand(new ParamCheckHandler());
+        addCommand(new InvokeServiceHandler());
+    }
+}
+```
+
+```java
+public class Client {
+
+    public static void main(String[] args) throws Exception {
+        Chains chains = new Chains();
+        CommonContext commonContext = new CommonContext();
+        commonContext.put("request", "this hack");
+        System.out.println(chains.execute(commonContext));
+        System.out.println(JSON.toJSONString(commonContext));
+
+        commonContext = new CommonContext();
+        commonContext.put("request", "this error");
+        System.out.println(chains.execute(commonContext));
+        System.out.println(JSON.toJSONString(commonContext));
+
+        commonContext = new CommonContext();
+        commonContext.put("request", "this is normal request");
+        System.out.println(chains.execute(commonContext));
+        System.out.println(JSON.toJSONString(commonContext));
+    }
+}
+```
+
+# Spring和Commons Chain
+
+```java
+public class CommonContext extends ContextBase {
+}
+```
+
+```java
+public abstract class AbstractCommand implements Command {
+
+    @Override
+    public boolean execute(Context context) throws Exception {
+        CommonContext commonContext = (CommonContext) context;
+        return execute(commonContext);
+    }
+
+    public abstract boolean execute(CommonContext context);
+}
+```
+
+```java
+@Component
+public class BlacklistCommand extends AbstractCommand {
+
+    @Override
+    public boolean execute(CommonContext context) {
+        System.out.println("BlacklistCommand...");
+        String request = String.valueOf(context.get("request"));
+        if (request.contains("hack")) {
+            context.put("error", "ip locked");
+            return true;
+        }
+        return false;
+    }
+}
+```
+
+```java
+@Component
+public class FlowControlCommand extends AbstractCommand {
+
+    @Override
+    public boolean execute(CommonContext context) {
+        System.out.println("FlowControlCommand...");
+        return false;
+    }
+}
+```
+
+```java
+@Component
+public class ParamCheckCommand extends AbstractCommand {
+
+    @Override
+    public boolean execute(CommonContext context) {
+        System.out.println("ParamCheckCommand...");
+        String request = String.valueOf(context.get("request"));
+        if (request.contains("error")) {
+            context.put("error", "param error!");
+            return true;
+        }
+        return false;
+    }
+}
+```
+
+```java
+@Component
+public class InvokeServiceCommand extends AbstractCommand {
+
+    @Override
+    public boolean execute(CommonContext context) {
+        System.out.println("InvokeServiceCommand...");
+        String request = String.valueOf(context.get("request"));
+
+        String result = "result for request: " + request;
+        context.put("result", result);
+        return false;
+    }
+}
+```
+
+```java
+public class Chains extends ChainBase {
+
+    public Chains() {
+        addCommand(new BlacklistCommand());
+        addCommand(new FlowControlCommand());
+        addCommand(new ParamCheckCommand());
+        addCommand(new InvokeServiceCommand());
+    }
+}
+```
+
+```java
+@Configuration
+public class CommonsChainConfig {
+
+    @Bean
+    public Chains chains() {
+        return new Chains();
+    }
+}
+```
+
+```java
+@RestController
+@RequestMapping("/chain")
+public class ChainController {
+
+    @Resource
+    private Chains chains;
+
+    @RequestMapping(value = "/commonsChainTest", method = RequestMethod.GET)
+    public String commonsChainTest(@RequestParam String str) throws Exception {
+        CommonContext commonContext = new CommonContext();
+        commonContext.put("request", str);
+        System.out.println(chains.execute(commonContext));
+        System.out.println(JSON.toJSONString(commonContext));
+
+        String result = commonContext.get("result") == null ? (String) commonContext.get("error") : (String) commonContext.get("result");
+        return result;
+    }
+}
+```
+
