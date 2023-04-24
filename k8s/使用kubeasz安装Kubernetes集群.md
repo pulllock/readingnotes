@@ -630,4 +630,36 @@ HARBOR_WITH_CHARTMUSEUM: true
 
 - 在浏览器中使用地址访问dashboard：`https://192.168.1.20:30971`，注意这里IP是kubernetes-node-01的ip
 
-- 登录方式使用Token方式，需要再kubernetes-master-01上查询token：`kubectl describe -n kube-system secrets dashboard-read-user`，在结果中找到`token:`后面的就是需要的Token，示例：`eyJhbGciOiJSUzI1NiIsImtpZCI6Imh1OGptMElzN1Jib25JbzVaNVIzY3ZyelZVMFJMY1g5Q21pVUktXzBENk0ifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJkYXNoYm9hcmQtcmVhZC11c2VyIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImRhc2hib2FyZC1yZWFkLXVzZXIiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiJmMDBkMmE5MS1lMTZmLTRjMTctOGJlMi1hNWJhOTVlYzFjMmYiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZS1zeXN0ZW06ZGFzaGJvYXJkLXJlYWQtdXNlciJ9.XrXagcKZSs29eWpbFuJJiAub2-Ob8SKQvDwU1MKZpXjWsHC3b55rQGFyIPlxb8X3GtV4L6Vll-5Yhfb_7tVbCSoG3DBEHMJQ14ejJOFtL63SNuPZnEweRcwHunayou8N-nfLzuX807rYrh7srirrV3AXUXOXiY3ODRRTtDIQh1VzO8Jw3xAmLE4FrammSISPcVDkLoRw0WRRb_eiq6nLm55i5uFUuGPg0_zvNJqg16Cu-0zynW5CLY8S3vCqtTehY98xnTOOxpHVbKOlBhwhiFt7OK5ui29Dd_CrONnrDp2R-984mvZgp0XYnNpJObnC0YdNOOBLtGkXYsdZYrxdEQ`，拷贝到浏览器的dashboard界面中进行登录即可
+- 登录方式使用Token方式，需要再kubernetes-master-01上查询token：`kubectl describe -n kube-system secrets admin-user`，在结果中找到`token:`后面的就是需要的Token，示例：`eyJhbGciOiJSUzI1NiIsImtpZCI6Imh1OGptMElzN1Jib25JbzVaNVIzY3ZyelZVMFJMY1g5Q21pVUktXzBENk0ifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJhZG1pbi11c2VyIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImFkbWluLXVzZXIiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiI2YzBjZDUzZS01ZDUyLTQ2YTQtODgyYy0wMDNmZTM0ZmE0OWYiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZS1zeXN0ZW06YWRtaW4tdXNlciJ9.CH9mBMf2Irx_YRGl-Tkxdg-U3A_TLaSi_csSB6i_H_Za3FO555BX83_YP5wBgbvSAJeZDKUX08oKl6q5sGC_-EPkBtePY1n3CevVG4JGcyUsy0cEI6LLIdEY5P0gmTJ1He7LpGh0NKSCJ8RYdmuukACQBYjDMRU_9S1VZFy7pCjyHoH-V2Wt97gPPGzA5plpW0UlaOtMs-vqcXYO_uzMwZYyewi1lycktw2J_GDxJ3OKku8UH3SXrtsPjZzpWuZb1ddWrLNdWi6GZ4PwVCROZLu8xEgIF00snBsVrEM6jnBuN1IsPnj6wOngHyfW0OUV8TUp4hqCE2qvy4AFe5jSsw`，拷贝到浏览器的dashboard界面中进行登录即可
+
+# 配置kubernetes-master-01的docker的仓库为自定义部署的harbor
+
+自定义的harbor部署参考：单节点安装harbor.md。
+
+此步骤需要在kubernetes-master-01上进行操作。
+
+- 修改文件：`vim /etc/docker/daemon.json`，将`"insecure-registries": ["http://easzlab.io.local:5000"]`修改为`"insecure-registries":["http://192.168.1.30:8070"]`，保存修改
+
+- 重启docker服务：`systemctl restart docker`
+
+# 配置kubernetes-master-01的containerd的仓库为自定义部署的harbor
+
+自定义的harbor部署参考：单节点安装harbor.md。
+
+此步骤需要在kubernetes-master-01上进行操作。
+
+- 修改文件：`vim /etc/containerd/config.toml`，找到`[plugins."io.containerd.grpc.v1.cri".registry]`，在`[plugins."io.containerd.grpc.v1.cri".registry.configs]`下面添加：
+  
+  ```toml
+  [plugins."io.containerd.grpc.v1.cri".registry.configs."192.168.1.30:8070".tls]
+            insecure_skip_verify = true
+  ```
+
+- 在`[plugins."io.containerd.grpc.v1.cri".registry.mirrors]`下面添加：
+  
+  ```toml
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."192.168.1.30:8070"]
+            endpoint = ["http://192.168.1.30:8070"]
+  ```
+
+- 重启containerd服务：`systemctl restart containerd`
