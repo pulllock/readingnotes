@@ -2,11 +2,11 @@
 
 一台master服务器、两台node服务器
 
-| 虚拟机                  | IP            | 安装组件                                                       |     |
-| -------------------- | ------------- | ---------------------------------------------------------- | --- |
-| kubernetes-master-01 | 192.168.10.10 | kube-apiserver、kube-controller-manager、kube-scheduler、etcd |     |
-| kubernetes-node-01   | 192.168.10.20 | kubelet、kube-proxy、docker、etcd                             |     |
-| kubernetes-node-02   | 192.168.10.21 | kubelet、kube-proxy、docker、etcd                             |     |
+| 虚拟机                  | IP           | 安装组件                                                       |     |
+| -------------------- |--------------| ---------------------------------------------------------- | --- |
+| kubernetes-master-01 | 192.168.1.10 | kube-apiserver、kube-controller-manager、kube-scheduler、etcd |     |
+| kubernetes-node-01   | 192.168.1.20 | kubelet、kube-proxy、docker、etcd                             |     |
+| kubernetes-node-02   | 192.168.1.21 | kubelet、kube-proxy、docker、etcd                             |     |
 
 # 总体安装步骤
 
@@ -58,13 +58,13 @@ VirtualBox设置：
 
 - Choose type of install: Ubuntu Server
 
-- Network connections: 第一个NAT网卡保持默认，第二个Bridged Adapter网卡设置IP为：192.168.10.10，设置如下：
+- Network connections: 第一个NAT网卡保持默认，第二个Bridged Adapter网卡设置IP为：192.168.1.10，设置如下：
   
   - IPv4 Method: Manual
   
-  - Subnet: 192.168.10.0/24
+  - Subnet: 192.168.1.0/24
   
-  - Address: 192.168.10.10
+  - Address: 192.168.1.10
   
   - Gateway: 192.168.1.1
   
@@ -158,13 +158,13 @@ VirtualBox设置：
 
 - Choose type of install: Ubuntu Server
 
-- Network connections: 第一个NAT网卡保持默认，第二个Bridged Adapter网卡设置IP为：192.168.10.20，设置如下：
+- Network connections: 第一个NAT网卡保持默认，第二个Bridged Adapter网卡设置IP为：192.168.1.20，设置如下：
   
   - IPv4 Method: Manual
   
-  - Subnet: 192.168.10.0/24
+  - Subnet: 192.168.1.0/24
   
-  - Address: 192.168.10.20
+  - Address: 192.168.1.20
   
   - Gateway: 192.168.1.1
   
@@ -258,13 +258,13 @@ VirtualBox设置：
 
 - Choose type of install: Ubuntu Server
 
-- Network connections: 第一个NAT网卡保持默认，第二个Bridged Adapter网卡设置IP为：192.168.10.21，设置如下：
+- Network connections: 第一个NAT网卡保持默认，第二个Bridged Adapter网卡设置IP为：192.168.1.21，设置如下：
   
   - IPv4 Method: Manual
   
-  - Subnet: 192.168.10.0/24
+  - Subnet: 192.168.1.0/24
   
-  - Address: 192.168.10.21
+  - Address: 192.168.1.21
   
   - Gateway: 192.168.1.1
   
@@ -386,9 +386,9 @@ VirtualBox设置：
   {
       "CN": "etcd",
       "hosts": [
-          "192.168.10.10",
-          "192.168.10.20",
-          "192.168.10.21"
+          "192.168.1.10",
+          "192.168.1.20",
+          "192.168.1.21"
           ],
       "key": {
           "algo": "rsa",
@@ -420,15 +420,15 @@ ETCD_NAME="etcd-1"
 # 数据目录
 ETCD_DATA_DIR="/var/lib/etcd"
 # 集群通信监听地址，当前服务器IP
-ETCD_LISTEN_PEER_URLS="https://192.168.10.10:2380"
+ETCD_LISTEN_PEER_URLS="https://192.168.1.10:2380"
 # 客户端访问监听地址，当前服务器IP
-ETCD_LISTEN_CLIENT_URLS="https://192.168.10.10:2379"
+ETCD_LISTEN_CLIENT_URLS="https://192.168.1.10:2379"
 # 集群通告地址，当前服务器IP
-ETCD_INITIAL_ADVERTISE_PEER_URLS="https://192.168.10.10:2380"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="https://192.168.1.10:2380"
 # 客户端通告地址
-ETCD_ADVERTISE_CLIENT_URLS="https://192.168.10.10:2379"
+ETCD_ADVERTISE_CLIENT_URLS="https://192.168.1.10:2379"
 # 集群节点地址
-ETCD_INITIAL_CLUSTER="etcd-1=https://192.168.10.10:2380,etcd-2=https://192.168.10.20:2380,etcd-3=https://192.168.10.21:2380"
+ETCD_INITIAL_CLUSTER="etcd-1=https://192.168.1.10:2380,etcd-2=https://192.168.1.20:2380,etcd-3=https://192.168.1.21:2380"
 # 集群Token
 ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster-01"
 # 加入集群的当前状态，new-新集群 existing-加入已有集群
@@ -505,9 +505,9 @@ ETCD_PEER_TRUSTED_CA_FILE="/opt/etcd/ssl/ca.pem"
   {
       "CN": "etcd",
       "hosts": [
-          "192.168.10.10",
-          "192.168.10.20",
-          "192.168.10.21"
+          "192.168.1.10",
+          "192.168.1.20",
+          "192.168.1.21"
           ],
       "key": {
           "algo": "rsa",
@@ -539,15 +539,15 @@ ETCD_NAME="etcd-2"
 # 数据目录
 ETCD_DATA_DIR="/var/lib/etcd"
 # 集群通信监听地址，当前服务器IP
-ETCD_LISTEN_PEER_URLS="https://192.168.10.20:2380"
+ETCD_LISTEN_PEER_URLS="https://192.168.1.20:2380"
 # 客户端访问监听地址，当前服务器IP
-ETCD_LISTEN_CLIENT_URLS="https://192.168.10.20:2379"
+ETCD_LISTEN_CLIENT_URLS="https://192.168.1.20:2379"
 # 集群通告地址，当前服务器IP
-ETCD_INITIAL_ADVERTISE_PEER_URLS="https://192.168.10.20:2380"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="https://192.168.1.20:2380"
 # 客户端通告地址
-ETCD_ADVERTISE_CLIENT_URLS="https://192.168.10.20:2379"
+ETCD_ADVERTISE_CLIENT_URLS="https://192.168.1.20:2379"
 # 集群节点地址
-ETCD_INITIAL_CLUSTER="etcd-1=https://192.168.10.10:2380,etcd-2=https://192.168.10.20:2380,etcd-3=https://192.168.10.21:2380"
+ETCD_INITIAL_CLUSTER="etcd-1=https://192.168.1.10:2380,etcd-2=https://192.168.1.20:2380,etcd-3=https://192.168.1.21:2380"
 # 集群Token
 ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster-01"
 # 加入集群的当前状态，new-新集群 existing-加入已有集群
@@ -624,9 +624,9 @@ ETCD_PEER_TRUSTED_CA_FILE="/opt/etcd/ssl/ca.pem"
   {
       "CN": "etcd",
       "hosts": [
-          "192.168.10.10",
-          "192.168.10.20",
-          "192.168.10.21"
+          "192.168.1.10",
+          "192.168.1.20",
+          "192.168.1.21"
           ],
       "key": {
           "algo": "rsa",
@@ -658,15 +658,15 @@ ETCD_NAME="etcd-3"
 # 数据目录
 ETCD_DATA_DIR="/var/lib/etcd"
 # 集群通信监听地址，当前服务器IP
-ETCD_LISTEN_PEER_URLS="https://192.168.10.21:2380"
+ETCD_LISTEN_PEER_URLS="https://192.168.1.21:2380"
 # 客户端访问监听地址，当前服务器IP
-ETCD_LISTEN_CLIENT_URLS="https://192.168.10.21:2379"
+ETCD_LISTEN_CLIENT_URLS="https://192.168.1.21:2379"
 # 集群通告地址，当前服务器IP
-ETCD_INITIAL_ADVERTISE_PEER_URLS="https://192.168.10.21:2380"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="https://192.168.1.21:2380"
 # 客户端通告地址
-ETCD_ADVERTISE_CLIENT_URLS="https://192.168.10.21:2379"
+ETCD_ADVERTISE_CLIENT_URLS="https://192.168.1.21:2379"
 # 集群节点地址
-ETCD_INITIAL_CLUSTER="etcd-1=https://192.168.10.10:2380,etcd-2=https://192.168.10.20:2380,etcd-3=https://192.168.10.21:2380"
+ETCD_INITIAL_CLUSTER="etcd-1=https://192.168.1.10:2380,etcd-2=https://192.168.1.20:2380,etcd-3=https://192.168.1.21:2380"
 # 集群Token
 ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster-01"
 # 加入集群的当前状态，new-新集群 existing-加入已有集群
@@ -787,7 +787,7 @@ ETCD_PEER_TRUSTED_CA_FILE="/opt/etcd/ssl/ca.pem"
   {
       "CN": "kubernetes",
       "hosts": [
-          "192.168.10.10"
+          "192.168.1.10"
           ],
       "key": {
           "algo": "rsa",
@@ -835,12 +835,12 @@ ETCD_PEER_TRUSTED_CA_FILE="/opt/etcd/ssl/ca.pem"
   KUBE_APISERVER_OPTS="--logtostderr=false \
   --v=2 \
   --log-dir=/opt/kubernetes/logs \
-  --etcd-servers=https://192.168.10.10:2379,https://192.168.10.20:2379,https://192.168.10.21:2379 \
-  --bind-address=192.168.10.10 \
+  --etcd-servers=https://192.168.1.10:2379,https://192.168.1.20:2379,https://192.168.1.21:2379 \
+  --bind-address=192.168.1.10 \
   --secure-port=6443 \
-  --advertise-address=192.168.10.10 \
+  --advertise-address=192.168.1.10 \
   --allow-privileged=true \
-  --service-cluster-ip-range=192.168.10.0/24 \
+  --service-cluster-ip-range=192.168.1.0/24 \
   --enable-admission-plugins=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota,NodeRestriction \
   --authorization-mode=RBAC,Node \
   --enable-bootstrap-token-auth=true \
@@ -910,7 +910,7 @@ ETCD_PEER_TRUSTED_CA_FILE="/opt/etcd/ssl/ca.pem"
   --address=127.0.0.1 \
   --allocate-node-cidrs=true \
   --cluster-cidr=10.244.0.0/16 \
-  --service-cluster-ip-range=192.168.10.0/24 \
+  --service-cluster-ip-range=192.168.1.0/24 \
   --cluster-signing-cert-file=/opt/kubernetes/ssl/ca.pem \
   --cluster-signing-key-file=/opt/kubernetes/ssl/ca-key.pem  \
   --root-ca-file=/opt/kubernetes/ssl/ca.pem \
