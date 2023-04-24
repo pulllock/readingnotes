@@ -303,7 +303,7 @@ VirtualBox设置：
 # 192.168.1.1
 # 192.168.1.2
 # 192.168.1.3
-192.168.222.10
+192.168.1.10
 
 # master node(s), set unique 'k8s_nodename' for each node
 # CAUTION: 'k8s_nodename' must consist of lower case alphanumeric characters, '-' or '.',
@@ -312,7 +312,7 @@ VirtualBox设置：
 # 192.168.1.1 k8s_nodename='master-01'
 # 192.168.1.2 k8s_nodename='master-02'
 # 192.168.1.3 k8s_nodename='master-03'
-192.168.222.10 k8s_nodename='kubernetes-master-01'
+192.168.1.10 k8s_nodename='kubernetes-master-01'
 
 # work node(s), set unique 'k8s_nodename' for each node
 # CAUTION: 'k8s_nodename' must consist of lower case alphanumeric characters, '-' or '.',
@@ -320,7 +320,7 @@ VirtualBox设置：
 [kube_node]
 # 192.168.1.4 k8s_nodename='worker-01'
 # 192.168.1.5 k8s_nodename='worker-02'
-192.168.222.20 k8s_nodename='kubernetes-node-01'
+192.168.1.20 k8s_nodename='kubernetes-node-01'
 
 # [optional] harbor server, a private docker registry
 # 'NEW_INSTALL': 'true' to install a harbor server; 'false' to integrate with existed one
@@ -462,7 +462,7 @@ MASTER_CERT_HOSTS:
   # - "10.1.1.1"
   # - "k8s.easzlab.io"
   # - "www.test.com"
-  - 192.168.222.10
+  - 192.168.1.10
 
 # node 节点上 pod 网段掩码长度（决定每个节点最多能分配的pod ip地址）
 # 如果flannel 使用 --kube-subnet-mgr 参数，那么它将读取该设置为每个节点分配pod网段
