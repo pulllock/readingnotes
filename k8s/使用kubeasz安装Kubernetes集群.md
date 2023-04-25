@@ -5,7 +5,7 @@
 | 虚拟机                  | IP           | 安装组件                                                                            | 资源              |
 | -------------------- | ------------ | ------------------------------------------------------------------------------- | --------------- |
 | kubernetes-master-01 | 192.168.1.10 | kube-apiserver、kube-controller-manager、kube-scheduler、kubernetes-dashboard、etcd | 1CPU、1G内存、20G硬盘 |
-| kubernetes-node-01   | 192.168.1.20 | kubelet、kube-proxy、docker                                                       | 1CPU、1G内存、20G硬盘 |
+| kubernetes-node-01   | 192.168.1.20 | kubelet、kube-proxy、docker                                                       | 1CPU、2G内存、20G硬盘 |
 
 # 总体安装步骤
 
@@ -149,7 +149,7 @@ VirtualBox设置：
 
 - Version: Ubuntu (64-bit)
 
-- Memory size: 1024MB
+- Memory size: 2048MB
 
 - Hard disk: Creat a virtual hard disk now
 

@@ -2,9 +2,9 @@
 
 单节点部署harbor
 
-| 虚拟机       | IP           | 资源               |
-| --------- | ------------ | ---------------- |
-| devops-01 | 192.168.1.30 | 1CPU、2G内存、100G硬盘 |
+| 虚拟机       | IP           | 安装组件                         | 资源               |
+| --------- | ------------ | ---------------------------- | ---------------- |
+| devops-01 | 192.168.1.30 | docker、docker compose、harbor | 2CPU、6G内存、100G硬盘 |
 
 # 安装服务器：devops-01
 
@@ -16,9 +16,9 @@ VirtualBox设置：
 
 - Version: Ubuntu (64-bit)  
 
-- Memory size: 2048MB  
+- Memory size: 6144MB  
 
-- CPU：1  
+- CPU：2
 
 - Hard disk: Create a virtual hard disk now  
 
@@ -124,7 +124,7 @@ VirtualBox设置：
 
 # 安装docker和docker-compose
 
-- 安装docker：`apt install docker`
+- 安装docker：`apt install docker.io`
 
 - 安装docker-compose：`apt install docker-compose`
 
@@ -425,4 +425,6 @@ cache:
 
 - 账号密码：admin/Harbor12345
 
-# 
+# 重启
+
+- 重启服务器后，可以进入解压后的目录：`cd harbor`，使用`docker-compose restart`命令重启服务

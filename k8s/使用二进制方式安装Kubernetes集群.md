@@ -3,7 +3,7 @@
 一台master服务器、两台node服务器
 
 | 虚拟机                  | IP           | 安装组件                                                       |     |
-| -------------------- |--------------| ---------------------------------------------------------- | --- |
+| -------------------- | ------------ | ---------------------------------------------------------- | --- |
 | kubernetes-master-01 | 192.168.1.10 | kube-apiserver、kube-controller-manager、kube-scheduler、etcd |     |
 | kubernetes-node-01   | 192.168.1.20 | kubelet、kube-proxy、docker、etcd                             |     |
 | kubernetes-node-02   | 192.168.1.21 | kubelet、kube-proxy、docker、etcd                             |     |
