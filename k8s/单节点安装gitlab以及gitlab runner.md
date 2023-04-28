@@ -5,7 +5,7 @@
 | 虚拟机       | IP           | 安装组件                                | 资源               |
 | --------- | ------------ | ----------------------------------- | ---------------- |
 | devops-01 | 192.168.1.30 | docker、docker compose、harbor、gitlab | 2CPU、6G内存、100G硬盘 |
-| devops-02 | 192.168.1.31 | gitlab runner、maven                 | 1CPU、2G内存、100G硬盘 |
+| devops-02 | 192.168.1.31 | gitlab runner、maven、docker、kubectl  | 1CPU、2G内存、100G硬盘 |
 
 # 安装服务器：devops-01
 
