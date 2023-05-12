@@ -1,0 +1,46 @@
+- 登陆：`mysql -uroot -p12345678 -h127.0.0.1`
+- 查看所有数据库：`show databases;`
+- 使用数据库：`use 数据库名;`
+- 创建数据库：`create database 数据库名;`
+- 查看创建的数据库的定义：`show create database 数据库名 \G;`
+- 删除数据库：`drop database 数据库名;`
+- 查看数据库的默认编码：`show variables like 'character_set_database';`
+- 查看表基本结构：`describe 表名;`或者`desc 表名;`
+- 查看表详细结构语句：`show create table 表名 \G;`
+- 修改表名：`alter table 旧表名 rename 新表名;`或者`alter table 旧表名 rename to 新表名;`
+- 修改字段数据类型：`alter table 表名 modify 字段名 数据类型;`
+- 修改字段名：`alter table 表名 change 旧字段名 新字段名 新数据类型;`
+- 添加字段：`alter table 表名 add 新字段名 数据类型 [约束条件] [first | after 已存在字段名];`
+- 删除字段：`alter table 表名 drop 字段名;`
+- 修改字段的排列位置：`alter table 表名 modify 字段1 数据类型 first|after 字段2;`
+- 更改表的存储引擎：`alter table 表名 engine=存储引擎名;`
+- 删除表的外键约束：`alter table 表明 drop foreign key 外键约束名;`
+- 删除表：`drop table [if exists] 表1, 表2, ...表n;`
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
+- ：``
