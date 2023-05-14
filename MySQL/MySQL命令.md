@@ -16,7 +16,7 @@
 - 更改表的存储引擎：`alter table 表名 engine=存储引擎名;`
 - 删除表的外键约束：`alter table 表明 drop foreign key 外键约束名;`
 - 删除表：`drop table [if exists] 表1, 表2, ...表n;`
-- ：``
+- 显示正在运行的进程：`show processlist;`或`show full processlist;`
 - ：``
 - ：``
 - ：``
