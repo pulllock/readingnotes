@@ -1,4 +1,10 @@
 - 登陆：`mysql -uroot -p12345678 -h127.0.0.1`
+  - `-h`：主机名，如果不指定默认是localhost
+  - `-u`：用户名
+  - `-p`：密码
+  - `-P`：端口号
+  - `数据库名`：命令最后指定数据库名
+  - `-e`：执行SQL语句
 - 查看所有数据库：`show databases;`
 - 使用数据库：`use 数据库名;`
 - 创建数据库：`create database 数据库名;`
@@ -17,14 +23,14 @@
 - 删除表的外键约束：`alter table 表明 drop foreign key 外键约束名;`
 - 删除表：`drop table [if exists] 表1, 表2, ...表n;`
 - 显示正在运行的进程：`show processlist;`或`show full processlist;`
-- ：``
-- ：``
-- ：``
-- ：``
-- ：``
-- ：``
-- ：``
-- ：``
+- 创建用户：`create user '用户名'@'localhost' identified by '密码';`
+- 删除用户：`drop user 用户名;`
+- 删除用户权限：`drop user '用户名'@'localhost';`
+- mysqldump备份：`mysqldump -u 用户名 -h 主机名 -p密码 数据库名 [表名, [表名...]] > 文件名.sql`
+- mysqldump备份多个数据库：`mysqldump -u 用户名 -h 主机名 -p密码 --databases [数据库名, [数据库名...]] > 文件名.sql`
+- mysqldump备份所有数据库：`mysqldump -u 用户名 -h 主机名 -p密码 --all-databases > 文件名.sql`
+- 恢复：`mysql -u 用户名 -p密码 [数据库名] < 文件名.sql`
+- 分析查询语句：`explain [extended] 查询语句;`
 - ：``
 - ：``
 - ：``

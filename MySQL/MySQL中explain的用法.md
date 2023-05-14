@@ -1,17 +1,12 @@
-（未总结）
-## 使用
-直接使用explain加上要分析的sql语句就可以了，比如：
-
+# 使用
 ```
-explain select * from t_user where userId = 1001;
+explain 查询语句;
 ```
-执行完之后，结果就会以表的形式展现出来。
+# 结果列说明
 
-## 结果列说明
-
-### id
+## id
 按照查询由外而内的顺序排序，最外层的为1，最内层的子查询依次加1。
-### select_type
+## select_type
 select类型，有以下几种：
 
 - simple，简单查询
@@ -22,9 +17,9 @@ select类型，有以下几种：
 - union result，union的结果
 - subquery，子查询中的第一个select
 - dependent subquery，子查询中的第一个select，取决于外面的查询
-### table
+## table
 当前行的数据是由哪个表产生的，derived1，derived2...表示的是衍生表，中间表。
-### type
+## type
 表示使用哪种类别的连接，以及使用索引的情况。结果值从好到坏依次是：
 `system > const > eq_ref > ref > fulltext > ref_or_null > index_merge > unique_subquery > index_subquery > range > index > ALL`
 
@@ -39,38 +34,38 @@ select类型，有以下几种：
 - range，只检索给定范围的行，使用一个索引来选择行。key列显示使用了哪个索引。key_len包含所使用索引的最长关键元素。在该类型中ref列为NULL。当使用=、<>、>、>=、<、<=、IS NULL、<=>、BETWEEN或者IN操作符，用常量比较关键字列时，可以使用range
 - index，该联接类型与ALL相同，除了只有索引树被扫描。这通常比ALL快，因为索引文件通常比数据文件小。当查询只使用作为单索引一部分的列时，MySQL可以使用该联接类型。
 - all，对于每个来自于先前的表的行组合，进行完整的表扫描。如果表是第一个没标记const的表，这通常不好，并且通常在它情况下很差。通常可以增加更多的索引而不要使用ALL，使得行能基于前面的表中的常数值或列值被检索出。
-### possible_keys
+## possible_keys
 MySQL能使用哪个索引在该表中找到行，该列完全独立于EXPLAIN输出所示的表的次序。这意味着在possible_keys中的某些键实际上不能按生成的表次序使用。
-### key
+## key
 显示MySQL实际决定使用的键（索引）。如果没有选择索引，键是NULL。要想强制MySQL使用或忽视possible_keys列中的索引，在查询中使用FORCE INDEX、USE INDEX或者IGNORE INDEX。
-### key_len
+## key_len
 显示MySQL决定使用的键长度。如果键是NULL，则长度为NULL。
 使用的索引的长度。在不损失精确性的情况下，长度越短越好 
-### ref
+## ref
 显示使用哪个列或常数与key一起从表中选择行。
-### rows
+## rows
 显示MySQL认为它执行查询时必须检查的行数。
-### Extra
+## Extra
 
 该列包含MySQL解决查询的详细信息。
 
-#### Distinct 
+### Distinct 
 一旦MYSQL找到了与行相联合匹配的行，就不再搜索了 
 
-#### Not exists 
+### Not exists 
 MYSQL优化了LEFT JOIN，一旦它找到了匹配LEFT JOIN标准的行，就不再搜索了 
 
-#### Range checked for each Record（index map:#） 
+### Range checked for each Record（index map:#） 
 没有找到理想的索引，因此对于从前面表中来的每一个行组合，MYSQL检查使用哪个索引，并用它来从表中返回行。这是使用索引的最慢的连接之一 
 
-#### Using filesort 
+### Using filesort 
 看到这个的时候，查询就需要优化了。MYSQL需要进行额外的步骤来发现如何对返回的行排序。它根据连接类型以及存储排序键值和匹配条件的全部行的行指针来排序全部行 
 
-#### Using index 
+### Using index 
 列数据是从仅仅使用了索引中的信息而没有读取实际的行动的表返回的，这发生在对表的全部的请求列都是同一个索引的部分的时候 
 
-#### Using temporary 
+### Using temporary 
 看到这个的时候，查询需要优化了。这里，MYSQL需要创建一个临时表来存储结果，这通常发生在对不同的列集进行ORDER BY上，而不是GROUP BY上 
 
-#### Using where
+### Using where
 使用了WHERE从句来限制哪些行将与下一张表匹配或者是返回给用户。如果不想返回表中的全部行，并且连接类型ALL或index，这就会发生，或者是查询有问题。
