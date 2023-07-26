@@ -1,3 +1,30 @@
+<!-- TOC -->
+* [公式排列](#公式排列)
+* [向量公式](#向量公式)
+* [分段函数](#分段函数)
+* [三角函数](#三角函数)
+* [对数函数](#对数函数)
+* [二元运算符](#二元运算符)
+* [关系符号](#关系符号)
+* [极限](#极限)
+* [向量](#向量)
+* [模运算](#模运算)
+* [箭头](#箭头)
+* [集合](#集合)
+* [微积分](#微积分)
+* [逻辑运算](#逻辑运算)
+* [希腊字母](#希腊字母)
+* [省略号](#省略号)
+* [上下标符号](#上下标符号)
+* [括号](#括号)
+* [增大括号](#增大括号)
+* [分式](#分式)
+* [根式](#根式)
+* [累加/累乘](#累加累乘)
+* [矩阵](#矩阵)
+* [编号](#编号)
+<!-- TOC -->
+
 # 公式排列
 
 | 数学算式            | markdown        | 说明  |
@@ -13,64 +40,9 @@
 
 # 分段函数
 
-$$
-y=
-\begin{cases}
--x, \quad x\leq 0 
-\\
-\\
-x, \quad x>0
-\end{cases}
-\tag{1}
-$$
-
-# 编号
-
-$$
-x^+y^2=z^2 \tag{1}
-$$
-
-$$
-x^+y^2=z^2 \tag{1$'$}
-$$
-
-$$
-x^+y^2=z^2 \tag{1-1}
-$$
-
-$$
-x^+y^2=z^2 \tag{*}
-$$
-
-$$
-x^+y^2=z^2 \tag*{*}
-$$
-
-对应markdown：
-
-```
-$$
-x^+y^2=z^2 \tag{1}
-$$
-
-$$
-x^+y^2=z^2 \tag{1$'$}
-$$
-
-$$
-x^+y^2=z^2 \tag{1-1}
-$$
-
-$$
-x^+y^2=z^2 \tag{*}
-$$
-
-$$
-x^+y^2=z^2 \tag*{*}
-$$
-```
-
-
+| 数学算式                                                             | markdown                                                         | 说明  |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------- | --- |
+| $y=\begin{cases} -x, \quad x \leq 0 \\ x, \quad x>0 \end{cases}$ | `y=\begin{cases} -x, \quad x \leq 0 \\ x, \quad x>0 \end{cases}` |     |
 
 # 三角函数
 
@@ -319,3 +291,148 @@ $$
 | $\cdots$ | `\cdots` |     |
 | $\vdots$ | `\vdots` |     |
 | $\ddots$ | `\ddots` |     |
+
+# 上下标符号
+
+| 数学算式                                                 | markdown                                             | 说明  |
+| ---------------------------------------------------- | ---------------------------------------------------- | --- |
+| $a_i$                                                | `a_i`                                                | 下标  |
+| $a^i$                                                | `a^i`                                                | 上标  |
+| $\bar{a}$                                            | `\bar{a}`                                            |     |
+| $\acute{a}$                                          | `\acute{a}`                                          |     |
+| $\breve{a}$                                          | `\breve{a}`                                          |     |
+| $\grave{a}$                                          | `\grave{a}`                                          |     |
+| $\dot{a}$                                            | `\dot{a}`                                            |     |
+| $\ddot{a}$                                           | `\ddot{a}`                                           |     |
+| $\dot {\dot x}$                                      | `\dot {\dot x}`                                      |     |
+| $\hat{a}$                                            | `\hat{a}`                                            |     |
+| $\widehat{xy}$                                       | `\widehat{xy}`                                       |     |
+| $\check{a}$                                          | `\check{a}`                                          |     |
+| $\breve{a}$                                          | `\breve{a}`                                          |     |
+| $\tilde{a}$                                          | `\tilde{a}`                                          |     |
+| $\vec{a}$                                            | `\vec{a}`                                            | 矢量  |
+| $\overrightarrow {xy}$                               | `\overrightarrow {xy}`                               | 向量  |
+| $\overline{a + b + c + d}$                           | `\overline{a + b + c + d}`                           |     |
+| $\underline{a + b + c + d}$                          | `\underline{a + b + c + d}`                          |     |
+| $\overbrace{a + b + c + d}$                          | `\overbrace{a + b + c + d}`                          |     |
+| $\underbrace{a + b + c + d}$                         | `\underbrace{a + b + c + d}`                         |     |
+| $\overbrace{a + \underbrace{b + c}_{1.0} + d}^{2.0}$ | `\overbrace{a + \underbrace{b + c}_{1.0} + d}^{2.0}` |     |
+
+# 括号
+
+| 数学算式      | markdown  | 说明  |
+| --------- | --------- | --- |
+| $($       | `(`       |     |
+| $)$       | `)`       |     |
+| $[$       | `[`       |     |
+| $]$       | `]`       |     |
+| $\lang$   | `\lang`   |     |
+| $\rang$   | `\rang`   |     |
+| $\langle$ | `\langle` |     |
+| $\rangle$ | `\rangle` |     |
+| $\lvert$  | `\lvert`  |     |
+| $\rvert$  | `\rvert`  |     |
+| $\lVert$  | `\lVert`  |     |
+| $\rVert$  | `\rVert`  |     |
+| $\lbrace$ | `\lbrace` |     |
+| $\rbrace$ | `\rbrace` |     |
+
+# 增大括号
+
+| 数学算式                                                                                                                   | markdown                                                                                                               | 说明  |
+| ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --- |
+| $(x)$                                                                                                                  | `(x)`                                                                                                                  |     |
+| $\big( x \big)$                                                                                                        | `\big( x \big)`                                                                                                        |     |
+| $\Big( x \Big)$                                                                                                        | `\Big( x \Big)`                                                                                                        |     |
+| $\bigg( x \bigg)$                                                                                                      | `\bigg( x \bigg)`                                                                                                      |     |
+| $\Bigg( x \Bigg)$                                                                                                      | `\Bigg( x \Bigg)`                                                                                                      |     |
+| $\Bigg(\bigg(\Big(\big((x)\big)\Big)\bigg)\Bigg)$                                                                      | `\Bigg(\bigg(\Big(\big((x)\big)\Big)\bigg)\Bigg)`                                                                      |     |
+| $\Bigg[\bigg[\Big[\big[[x]\big]\Big]\bigg]\Bigg]$                                                                      | `\Bigg[\bigg[\Big[\big[[x]\big]\Big]\bigg]\Bigg]`                                                                      |     |
+| $\Bigg \langle \bigg \langle \Big \langle\big\langle\langle x \rangle \big \rangle\Big\rangle\bigg\rangle\Bigg\rangle$ | `\Bigg \langle \bigg \langle \Big \langle\big\langle\langle x \rangle \big \rangle\Big\rangle\bigg\rangle\Bigg\rangle` |     |
+| $\Bigg\lvert\bigg\lvert\Big\lvert\big\lvert\lvert x \rvert\big\rvert\Big\rvert\bigg\rvert\Bigg\rvert$                  | `\Bigg\lvert\bigg\lvert\Big\lvert\big\lvert\lvert x \rvert\big\rvert\Big\rvert\bigg\rvert\Bigg\rvert`                  |     |
+| $\Bigg\lvert\bigg\lvert\Big\lvert\big\lvert\lvert x \rvert\big\rvert\Big\rvert\bigg\rvert\Bigg\rvert$                  | `\Bigg\lvert\bigg\lvert\Big\lvert\big\lvert\lvert x \rvert\big\rvert\Big\rvert\bigg\rvert\Bigg\rvert`                  |     |
+| $\Bigg\lVert\bigg\lVert\Big\lVert\big\lVert\lVert x \rVert\big\rVert\Big\rVert\bigg\rVert\Bigg\rVert$                  | `\Bigg\lVert\bigg\lVert\Big\lVert\big\lVert\lVert x \rVert\big\rVert\Big\rVert\bigg\rVert\Bigg\rVert`                  |     |
+| $\Bigg\lVert\bigg\lVert\Big\lVert\big\lVert\lVert x \rVert\big\rVert\Big\rVert\bigg\rVert\Bigg\rVert$                  | `\Bigg\lVert\bigg\lVert\Big\lVert\big\lVert\lVert x \rVert\big\rVert\Big\rVert\bigg\rVert\Bigg\rVert`                  |     |
+
+# 分式
+
+| 数学算式                        | markdown                    | 说明  |
+| --------------------------- | --------------------------- | --- |
+| $\frac{a}{b}$               | `\frac{a}{b}`               | 分式  |
+| $\cfrac{a}{\cfrac{b}{c+1}}$ | `\cfrac{a}{\cfrac{b}{c+1}}` | 连分式 |
+
+# 根式
+
+| 数学算式            | markdown        | 说明   |
+| --------------- | --------------- | ---- |
+| $\sqrt{a+b}$    | `\sqrt{a+b}`    | 开方   |
+| $\sqrt[n]{a+b}$ | `\sqrt[n]{a+b}` | 开n次方 |
+
+# 累加/累乘
+
+| 数学算式                         | markdown                     | 说明  |
+| ---------------------------- | ---------------------------- | --- |
+| $\sum_{i=0}^{n}x^2$          | `\sum_{i=0}^{n}x^2`          | 累加  |
+| $\prod_{i=0}^{n}\frac{1}{x}$ | `\prod_{i=0}^{n}\frac{1}{x}` | 累乘  |
+
+# 矩阵
+
+| 数学算式                                                                                                                                           | markdown                                                                                                                                       | 说明  |
+| ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| $\begin{pmatrix}1 & 2 \\ 3 &4 \\ \end{pmatrix}$                                                                                                | `\begin{pmatrix}1 & 2 \\ 3 &4 \\ \end{pmatrix}`                                                                                                |     |
+| $\begin{bmatrix}1 & 2 \\ 3 & 4 \\ \end{bmatrix}$                                                                                               | `\begin{bmatrix}1 & 2 \\ 3 & 4 \\ \end{bmatrix}`                                                                                               |     |
+| $\begin{Bmatrix}1 &2 \\ 3 & 4 \\ \end{Bmatrix}$                                                                                                | `\begin{Bmatrix}1 &2 \\ 3 & 4 \\ \end{Bmatrix}`                                                                                                |     |
+| $\begin{vmatrix}1 &2 \\ 3 &4 \\ \end{vmatrix}$                                                                                                 | `\begin{vmatrix}1 &2 \\ 3 &4 \\ \end{vmatrix}`                                                                                                 |     |
+| $\begin{Vmatrix}1 &  2 \\ 3 &  4 \\ \end{Vmatrix}$                                                                                             | `\begin{Vmatrix}1 &  2 \\ 3 &  4 \\ \end{Vmatrix}`                                                                                             |     |
+| $ \begin{pmatrix} &a_1&a_1^2&\cdots&a_1^n \\ &a_2&a_2^2&\cdots&a_2^n \\ &\vdots&\vdots&\ddots&\vdots \\ &a_m&a_m^2&\cdots&a_m^n \end{pmatrix}$ | `\begin{pmatrix} &a_1&a_1^2&\cdots&a_1^n \\ &a_2&a_2^2&\cdots&a_2^n \\ &\vdots&\vdots&\ddots&\vdots \\ &a_m&a_m^2&\cdots&a_m^n \end{pmatrix}$` |     |
+| $\begin{matrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{matrix}$                                                                              | `\begin{matrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{matrix}`                                                                              |     |
+| $\left[\begin{matrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{matrix} \right]$                                                                | `\left[\begin{matrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{matrix} \right]`                                                                |     |
+| $\left\{\begin{matrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{matrix} \right\}$                                                              | `\left\{\begin{matrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{matrix} \right\}`                                                              |     |
+| $\left[\begin{array}{c\|cc} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{array} \right]$                                                           | `\left[\begin{array}{c\|cc} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{array} \right]`                                                           |     |
+| $\left[\begin{array}{c\|cc} 1 & 2 & 3 \\ \hline 4 & 5 & 6 \\ 7 & 8 & 9 \end{array} \right]$                                                    | `\left[\begin{array}{c\|cc} 1 & 2 & 3 \\ \hline 4 & 5 & 6 \\ 7 & 8 & 9 \end{array} \right]`                                                    |     |
+
+# 编号
+
+$$
+x^2+y^2=z^2 \tag{1}
+$$
+
+$$
+x^2+y^2=z^2 \tag{1$'$}
+$$
+
+$$
+x^2+y^2=z^2 \tag{1-1}
+$$
+
+$$
+x^2+y^2=z^2 \tag{*}
+$$
+
+$$
+x^2+y^2=z^2 \tag*{*}
+$$
+
+对应markdown：
+
+```
+$$
+x^2+y^2=z^2 \tag{1}
+$$
+
+$$
+x^2+y^2=z^2 \tag{1$'$}
+$$
+
+$$
+x^2+y^2=z^2 \tag{1-1}
+$$
+
+$$
+x^2+y^2=z^2 \tag{*}
+$$
+
+$$
+x^2+y^2=z^2 \tag*{*}
+$$
+```
