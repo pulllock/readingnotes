@@ -231,10 +231,10 @@
 | $\in$         | `\in`         | 属于  |
 | $\ni$         | `\ni`         |     |
 | $\notin$      | `\notin`      | 不属于 |
-| $\subset$     | `\subset`     | 子集  |
+| $\subset$     | `\subset`     | 真子集 |
 | $\supset$     | `\supset`     | 父集  |
 | $\not\subset$ | `\not\subset` | 非子集 |
-| $\subseteq$   | `\subseteq`   | 真子集 |
+| $\subseteq$   | `\subseteq`   | 子集  |
 | $\subsetneq$  | `\subsetneq`  | 非子集 |
 | $\supseteq$   | `\supseteq`   |     |
 | $\cup$        | `\cup`        | 并集  |
