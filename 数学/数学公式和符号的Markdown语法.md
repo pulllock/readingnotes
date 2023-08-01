@@ -409,113 +409,249 @@ y=\begin{cases} -x, \quad x \leq 0 \\ x, \quad x>0 \end{cases}
 # 矩阵
 
 $$
-\begin{pmatrix}1 & 2 \\ 3 &4 \\ \end{pmatrix}
+\begin{pmatrix}
+1 & 2 
+\\ 
+3 &4 
+\\ 
+\end{pmatrix}
 $$
 
 markdown：
 
 ```
-\begin{pmatrix}1 & 2 \\ 3 &4 \\ \end{pmatrix}
+\begin{pmatrix}
+1 & 2 
+\\ 
+3 &4 
+\\ 
+\end{pmatrix}
 ```
 
 $$
-\begin{bmatrix}1 & 2 \\ 3 & 4 \\ \end{bmatrix}
-$$
-
-markdown:
-
-```
-\begin{bmatrix}1 & 2 \\ 3 & 4 \\ \end{bmatrix}
-```
-
-$$
-\begin{Bmatrix}1 &2 \\ 3 & 4 \\ \end{Bmatrix}
-$$
-
-markdown:
-
-```
-\begin{Bmatrix}1 &2 \\ 3 & 4 \\ \end{Bmatrix}
-```
-
-$$
-\begin{vmatrix}1 &2 \\ 3 &4 \\ \end{vmatrix}
+\begin{bmatrix} 
+1 & 2 
+\\ 
+3 & 4 
+\\ 
+\end{bmatrix}
 $$
 
 markdown:
 
 ```
-\begin{vmatrix}1 &2 \\ 3 &4 \\ \end{vmatrix}
+\begin{bmatrix} 
+1 & 2 
+\\ 
+3 & 4 
+\\ 
+\end{bmatrix}
 ```
 
 $$
-\begin{Vmatrix}1 &  2 \\ 3 &  4 \\ \end{Vmatrix}
-$$
-
-markdown:
-
-```
-\begin{Vmatrix}1 &  2 \\ 3 &  4 \\ \end{Vmatrix}
-```
-
-$$
-\begin{pmatrix} &a_1&a_1^2&\cdots&a_1^n \\ &a_2&a_2^2&\cdots&a_2^n \\ &\vdots&\vdots&\ddots&\vdots \\ &a_m&a_m^2&\cdots&a_m^n \end{pmatrix}
+\begin{Bmatrix} 
+1 &2 \\ 
+3 & 4 \\ 
+\end{Bmatrix}
 $$
 
 markdown:
 
 ```
-\begin{pmatrix} &a_1&a_1^2&\cdots&a_1^n \\ &a_2&a_2^2&\cdots&a_2^n \\ &\vdots&\vdots&\ddots&\vdots \\ &a_m&a_m^2&\cdots&a_m^n \end{pmatrix}
+\begin{Bmatrix} 
+1 &2 \\ 
+3 & 4 \\ 
+\end{Bmatrix}
 ```
 
 $$
-\begin{matrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{matrix}
-$$
-
-markdown:
-
-```
-\begin{matrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{matrix}
-```
-
-$$
-\left[\begin{matrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{matrix} \right]    
+\begin{vmatrix} 
+1 &2
+\\ 
+3 &4 
+\\ 
+\end{vmatrix}
 $$
 
 markdown:
 
 ```
-\left[\begin{matrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{matrix} \right]    
+\begin{vmatrix} 
+1 &2 
+\\ 
+3 &4 
+\\ 
+\end{vmatrix}
 ```
 
 $$
-\left\{\begin{matrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{matrix} \right\}
-$$
-
-markdown:
-
-```
-\left\{\begin{matrix} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{matrix} \right\}
-```
-
-$$
-\left[\begin{array}{c|cc} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{array} \right]
-$$
-
-markdown:
-
-```
-\left[\begin{array}{c|cc} 1 & 2 & 3 \\ 4 & 5 & 6 \\ 7 & 8 & 9 \end{array} \right]
-```
-
-$$
-\left[\begin{array}{c|cc} 1 & 2 & 3 \\ \hline 4 & 5 & 6 \\ 7 & 8 & 9 \end{array} \right]
+\begin{Vmatrix} 
+1 &  2 
+\\ 3 &  4 
+\\ 
+\end{Vmatrix}
 $$
 
 markdown:
 
 ```
-\left[\begin{array}{c|cc} 1 & 2 & 3 \\ \hline 4 & 5 & 6 \\ 7 & 8 & 9 \end{array} \right]
+\begin{Vmatrix} 
+1 &  2 
+\\ 3 &  4 
+\\ 
+\end{Vmatrix}
+```
+
+$$
+\begin{pmatrix} 
+&a_1 &a_1^2 & \cdots &a_1^n 
+\\ 
+&a_2 &a_2^2 &\cdots &a_2^n 
+\\ 
+&\vdots &\vdots &\ddots &\vdots 
+\\ 
+&a_m &a_m^2 &\cdots &a_m^n 
+\end{pmatrix}
+$$
+
+markdown:
+
+```
+\begin{pmatrix} 
+&a_1 &a_1^2 & \cdots &a_1^n 
+\\ 
+&a_2 &a_2^2 &\cdots &a_2^n 
+\\ 
+&\vdots &\vdots &\ddots &\vdots 
+\\ 
+&a_m &a_m^2 &\cdots &a_m^n 
+\end{pmatrix}
+```
+
+$$
+\begin{matrix} 
+1 & 2 & 3 
+\\ 4 & 5 & 6 
+\\ 
+7 & 8 & 9 
+\end{matrix}
+$$
+
+markdown:
+
+```
+\begin{matrix} 
+1 & 2 & 3 
+\\ 
+4 & 5 & 6 
+\\ 7 & 8 & 9 
+\end{matrix}
+```
+
+$$
+\left[
+\begin{matrix} 
+1 & 2 & 3 
+\\ 
+4 & 5 & 6 
+\\ 
+7 & 8 & 9 
+\end{matrix} 
+\right] 
+$$
+
+markdown:
+
+```
+\left[
+\begin{matrix} 
+1 & 2 & 3 
+\\ 
+4 & 5 & 6 
+\\ 
+7 & 8 & 9 
+\end{matrix} 
+\right]   
+```
+
+$$
+\left\{ 
+\begin{matrix} 
+1 & 2 & 3 
+\\ 
+4 & 5 & 6 
+\\ 
+7 & 8 & 9 
+\end{matrix} 
+\right\}
+$$
+
+markdown:
+
+```
+\left\{ 
+\begin{matrix} 
+1 & 2 & 3 
+\\ 
+4 & 5 & 6 
+\\ 
+7 & 8 & 9 
+\end{matrix} 
+\right\}
+```
+
+$$
+\left[
+\begin{array} {c|cc} 
+1 & 2 & 3 
+\\ 
+4 & 5 & 6 
+\\ 
+7 & 8 & 9 
+\end{array} 
+\right]
+$$
+
+markdown:
+
+```
+\left[
+\begin{array} {c|cc} 
+1 & 2 & 3 
+\\ 
+4 & 5 & 6 
+\\ 
+7 & 8 & 9 
+\end{array} 
+\right]
+```
+
+$$
+\left[ 
+\begin{array} {c|cc} 
+1 & 2 & 3 
+\\ 
+\hline 
+4 & 5 & 6 
+\\ 
+7 & 8 & 9 
+\end{array} 
+\right]
+$$
+
+markdown:
+
+```
+\left[ 
+\begin{array} {c|cc} 
+1 & 2 & 3 
+\\ 
+\hline 
+4 & 5 & 6 
+\\ 
+7 & 8 & 9 
+\end{array} 
+\right]
 ```
 
 # 编号
