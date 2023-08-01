@@ -544,7 +544,8 @@ markdown:
 1 & 2 & 3 
 \\ 
 4 & 5 & 6 
-\\ 7 & 8 & 9 
+\\ 
+7 & 8 & 9 
 \end{matrix}
 ```
 
@@ -575,7 +576,7 @@ markdown:
 ```
 
 $$
-\left\{ 
+\left \{ 
 \begin{matrix} 
 1 & 2 & 3 
 \\ 
@@ -583,13 +584,13 @@ $$
 \\ 
 7 & 8 & 9 
 \end{matrix} 
-\right\}
+\right \}
 $$
 
 markdown:
 
 ```
-\left\{ 
+\left \{ 
 \begin{matrix} 
 1 & 2 & 3 
 \\ 
@@ -597,7 +598,7 @@ markdown:
 \\ 
 7 & 8 & 9 
 \end{matrix} 
-\right\}
+\right \}
 ```
 
 $$
