@@ -409,11 +409,27 @@ y=\begin{cases} -x, \quad x \leq 0 \\ x, \quad x>0 \end{cases}
 # 矩阵
 
 $$
+\begin{matrix} 
+1 & 2 & 3 \\ 
+4 & 5 & 6 \\ 
+7 & 8 & 9 
+\end{matrix}
+$$
+
+markdown:
+
+```
+\begin{matrix} 
+1 & 2 & 3 \\ 
+4 & 5 & 6 \\ 
+7 & 8 & 9 
+\end{matrix}
+```
+
+$$
 \begin{pmatrix}
-1 & 2 
-\\ 
-3 &4 
-\\ 
+1 & 2 \\ 
+3 & 4 \\ 
 \end{pmatrix}
 $$
 
@@ -421,19 +437,15 @@ markdown：
 
 ```
 \begin{pmatrix}
-1 & 2 
-\\ 
-3 &4 
-\\ 
+1 & 2 \\ 
+3 & 4 \\ 
 \end{pmatrix}
 ```
 
 $$
 \begin{bmatrix} 
-1 & 2 
-\\ 
-3 & 4 
-\\ 
+1 & 2 \\ 
+3 & 4 \\ 
 \end{bmatrix}
 $$
 
@@ -441,16 +453,14 @@ markdown:
 
 ```
 \begin{bmatrix} 
-1 & 2 
-\\ 
-3 & 4 
-\\ 
+1 & 2 \\ 
+3 & 4 \\ 
 \end{bmatrix}
 ```
 
 $$
 \begin{Bmatrix} 
-1 &2 \\ 
+1 & 2 \\ 
 3 & 4 \\ 
 \end{Bmatrix}
 $$
@@ -459,17 +469,15 @@ markdown:
 
 ```
 \begin{Bmatrix} 
-1 &2 \\ 
+1 & 2 \\ 
 3 & 4 \\ 
 \end{Bmatrix}
 ```
 
 $$
 \begin{vmatrix} 
-1 &2
-\\ 
-3 &4 
-\\ 
+1 & 2 \\ 
+3 & 4 \\ 
 \end{vmatrix}
 $$
 
@@ -477,18 +485,15 @@ markdown:
 
 ```
 \begin{vmatrix} 
-1 &2 
-\\ 
-3 &4 
-\\ 
+1 & 2 \\ 
+3 & 4 \\ 
 \end{vmatrix}
 ```
 
 $$
 \begin{Vmatrix} 
-1 &  2 
-\\ 3 &  4 
-\\ 
+1 &  2 \\ 
+3 &  4 \\ 
 \end{Vmatrix}
 $$
 
@@ -496,20 +501,16 @@ markdown:
 
 ```
 \begin{Vmatrix} 
-1 &  2 
-\\ 3 &  4 
-\\ 
+1 &  2 \\ 
+3 &  4 \\ 
 \end{Vmatrix}
 ```
 
 $$
 \begin{pmatrix} 
-&a_1 &a_1^2 & \cdots &a_1^n 
-\\ 
-&a_2 &a_2^2 &\cdots &a_2^n 
-\\ 
-&\vdots &\vdots &\ddots &\vdots 
-\\ 
+&a_1 &a_1^2 & \cdots &a_1^n \\ 
+&a_2 &a_2^2 &\cdots &a_2^n \\ 
+&\vdots &\vdots &\ddots &\vdots \\ 
 &a_m &a_m^2 &\cdots &a_m^n 
 \end{pmatrix}
 $$
@@ -518,141 +519,94 @@ markdown:
 
 ```
 \begin{pmatrix} 
-&a_1 &a_1^2 & \cdots &a_1^n 
-\\ 
-&a_2 &a_2^2 &\cdots &a_2^n 
-\\ 
-&\vdots &\vdots &\ddots &\vdots 
-\\ 
+&a_1 &a_1^2 & \cdots &a_1^n \\ 
+&a_2 &a_2^2 &\cdots &a_2^n \\ 
+&\vdots &\vdots &\ddots &\vdots \\ 
 &a_m &a_m^2 &\cdots &a_m^n 
 \end{pmatrix}
 ```
 
 $$
-\begin{matrix} 
-1 & 2 & 3 
-\\ 4 & 5 & 6 
-\\ 
+\begin{bmatrix} 
+1 & 2 & 3 \\ 
+4 & 5 & 6 \\ 
 7 & 8 & 9 
-\end{matrix}
+\end{bmatrix} 
+
 $$
 
 markdown:
 
 ```
-\begin{matrix} 
-1 & 2 & 3 
-\\ 
-4 & 5 & 6 
-\\ 
+\begin{bmatrix} 
+1 & 2 & 3 \\ 
+4 & 5 & 6 \\ 
 7 & 8 & 9 
-\end{matrix}
+\end{bmatrix} 
 ```
 
 $$
-\left[
-\begin{matrix} 
-1 & 2 & 3 
-\\ 
-4 & 5 & 6 
-\\ 
+\begin{Bmatrix} 
+1 & 2 & 3 \\ 
+4 & 5 & 6 \\ 
 7 & 8 & 9 
-\end{matrix} 
-\right] 
+\end{Bmatrix} 
 $$
 
 markdown:
 
 ```
-\left[
-\begin{matrix} 
-1 & 2 & 3 
-\\ 
-4 & 5 & 6 
-\\ 
+\begin{Bmatrix} 
+1 & 2 & 3 \\ 
+4 & 5 & 6 \\ 
 7 & 8 & 9 
-\end{matrix} 
-\right]   
+\end{Bmatrix} 
 ```
 
 $$
-\left \{ 
-\begin{matrix} 
-1 & 2 & 3 
-\\ 
-4 & 5 & 6 
-\\ 
-7 & 8 & 9 
-\end{matrix} 
-\right \}
-$$
-
-markdown:
-
-```
-\left \{ 
-\begin{matrix} 
-1 & 2 & 3 
-\\ 
-4 & 5 & 6 
-\\ 
-7 & 8 & 9 
-\end{matrix} 
-\right \}
-```
-
-$$
-\left[
+\begin{bmatrix}
 \begin{array} {c|cc} 
-1 & 2 & 3 
-\\ 
-4 & 5 & 6 
-\\ 
+1 & 2 & 3 \\ 
+4 & 5 & 6 \\ 
 7 & 8 & 9 
 \end{array} 
-\right]
+\end{bmatrix} 
 $$
 
 markdown:
 
 ```
-\left[
+\begin{bmatrix}
 \begin{array} {c|cc} 
-1 & 2 & 3 
-\\ 
-4 & 5 & 6 
-\\ 
+1 & 2 & 3 \\ 
+4 & 5 & 6 \\ 
 7 & 8 & 9 
 \end{array} 
-\right]
+\end{bmatrix} 
 ```
 
 $$
-\left[ 
+\begin{bmatrix}
 \begin{array} {c|cc} 
-1 & 2 & 3 
-\\ 
+1 & 2 & 3 \\ 
 \hline 
-4 & 5 & 6 
-\\ 
+4 & 5 & 6 \\ 
 7 & 8 & 9 
 \end{array} 
-\right]
+\end{bmatrix} 
 $$
 
 markdown:
 
 ```
-\left[ 
+\begin{bmatrix}
 \begin{array} {c|cc} 
-1 & 2 & 3 
-\\ 
+1 & 2 & 3 \\ 
 \hline 
-4 & 5 & 6 
-\\ 
+4 & 5 & 6 \\ 
 7 & 8 & 9 
 \end{array} 
-\right]
+\end{bmatrix} 
 ```
 
 # 编号
