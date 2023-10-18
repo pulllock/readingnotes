@@ -1,5 +1,0 @@
-一个同步辅助类，允许一组线程相互等待，直到到达某个公共屏障点。barrier可重用。
-
-对于失败的同步尝试，CyclicBarrier使用了一种要么全部要么全部的破坏模式。如果因为中断失败超时等原因导致线程过早的离开了屏障点，那么在该屏障点等待的其他所有线程也将通过BrokenBarrierException以反常的方式离开。
-
-CyclicBarrier内部使用ReentrantLock独占锁实现。
