@@ -25,18 +25,58 @@ create table 表名
 ```
 
 - 查看表基本结构： `describe 表名;` 或者： `desc 表名;`
+
 - 查看表基本结构： `show create table 表名[\G];`
+
 - 修改表名： `alter table 旧表名 rename [to] 新表名;`
+
 - 修改字段类型： `alter table 表名 modify 字段名 数据类型;`
+
 - 修改字段名： `alter table 表名 change 旧字段名  新字段名 新数据类型;`
+
 - 添加字段： `alter table 表名 add 新字段名 数据类型 [约束条件] [first|after 已存在字段名];`
+
 - 删除字段： `alter table 表名 drop 字段名;`
+
 - 修改字段排列位置： `alter table 表名 modify 字段1 数据类型 first|after 字段2;`
+
 - 更改表的存储引擎： `alter table 表名 engine=新存储引擎名;`
+
 - 删除表的外键约束： `alter table 表名 drop foreign key 外键约束名;`
+
 - 删除没有被关联的表： `drop table [if exists] 表1, 表2, ..., 表n;`
+
 - 删除被其他表关联的主表： 需要先解除关联子表的外键约束，再删除主表
+
 - 查看表的默认编码，可使用查看表基本结构的命令： `show create table 表名[\G];`
+
+- 创建表的时候创建索引： `create table 表名 [字段名 数据类型] [unique | fulltext | spatial] [index | key] [索引名] (列名 [索引长度])； `
+
+- 在已经存在的表上创建索引：`alter table 表名 add [unique | fulltext | spatial] [index | key] [索引名] (列名 [索引长度], ...) [asc | desc]；`
+
+- 查看指定表中创建的索引： `show index from 表名\G;`，结果中字段如下：
+  
+  - Table表示创建索引的表
+  
+  - Non_unique表示索引非唯一，1是非唯一索引，0是唯一索引
+  
+  - Key_name索引名称
+  
+  - Seq_in_index该字段在索引中的位置
+  
+  - Column_name定义索引的列字段
+  
+  - Sub_part索引长度
+  
+  - Null表示该字段是否能为空值
+  
+  - Index_type表示索引类型
+
+- `create index`创建索引： `create [unique | fulltext | spatial] index 索引名 on 表名 (列名 [索引长度], ...) [asc | desc]；`
+
+- 删除索引： `alter table 表名 drop index 索引名；`
+
+- 删除索引： `drop index 索引名 on 表名;`
 
 # 查询语句
 
@@ -52,8 +92,6 @@ from <表名或视图名> [,<表名或视图名>...] | (<select 语句>) [as] <�
 [limit <offset>, <row count>]
 ;
 ```
-
-
 
 - 连接查询
   
@@ -538,3 +576,65 @@ select 列, ... from 表2
 ## 窗口函数
 
 窗口函数
+
+# explain语句
+
+explain输出结果字段解释如下：
+
+- id 表示编号，标识select所属行
+
+- select_type表示所使用的select查询类型，取值有如下：
+  
+  - simple表示简单查询，不包括子查询和UNION
+  
+  - primary如果查询有任何复杂的子部分，则最外层部分标记为primary
+  
+  - union在union中的第二个和随后的select被标记为union
+  
+  - union result用来从union的匿名临时表检索结果的select
+  
+  - subquery包含在select列表中的子查询中的select
+  
+  - derived用来表示包含在from子句的子查询中的select
+
+- table表示对应行正在访问哪个表
+
+- type，取值有如下（这些取值从上到下是最优到最差：
+  
+  - system
+  
+  - const
+  
+  - eq_ref索引查找，最多只返回一条符合条件的记录
+  
+  - ref索引访问（索引查找）
+  
+  - range范围扫描
+  
+  - index跟全表扫描一样，只是扫描表时按照索引次序进行，而不是按照行进行扫描。主要优点是避免了排序。
+  
+  - ALL全表扫描
+
+- possible_keys显示了查询可以使用哪些索引
+
+- key显示了MySQL决定采用哪个索引来优化对该表的访问
+
+- key_len显示了MySQL在索引里使用的字节数
+
+- ref显示了之前的表在key列记录的索引中查找值所用的列或常量
+
+- rows是估计为了找到所需行而要读取的行数
+
+- filtered显示的是针对表里符合某个条件的记录数的百分比所做的一个悲观估算
+
+- Extra显示额外信息，常见值如下：
+  
+  - Using index表示将使用覆盖索引，避免访问表
+  
+  - Using where表示将在存储引擎检索行后在进行过滤
+  
+  - Using temporary对查询结果排序时会使用一个临时表
+  
+  - Using filesort对结果使用一个外部索引排序，而不是按索引次序从表里读取行
+  
+  - Range checked for each record (index map: N)表示没有好用的索引，新的索引将在联接的每一行上重新估算。
