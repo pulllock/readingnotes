@@ -638,3 +638,126 @@ explain输出结果字段解释如下：
   - Using filesort对结果使用一个外部索引排序，而不是按索引次序从表里读取行
   
   - Range checked for each record (index map: N)表示没有好用的索引，新的索引将在联接的每一行上重新估算。
+
+# 存储过程和函数
+
+创建存储过程基本语法：
+
+```sql
+create procedure 存储过程名称
+([存储过程参数列表])
+[存储过程特性]
+存储过程的SQL代码体
+```
+
+各部分说明如下：
+
+- 存储过程参数列表，形式如下：`[IN | OUT | INOUT] 参数名 参数类型`
+  
+  - IN表示输入参数
+  
+  - OUT表示输出参数
+  
+  - INOUT表示既可以输入也可以输出
+  
+  - 参数类型可以是MySQL数据库中的任意类型
+
+- 存储过程特性，取值如下：
+  
+  - LANGUAGE SQL说明存储过程代码体是由SQL语句组成的
+  
+  - [NOT] DETERMINISTIC指明存储过程执行的结果是否正确
+    
+    - DETERMINISTIC表示结果是确定的
+    
+    - NOT DETERMINISTIC表示结果是不确定的，该值是默认值
+  
+  - {CONTAINS SQL | NO SQL | READS SQL DATA | MODIFIES SQL DATA}指明子程序使用SQL语句的限制
+    
+    - CONTAINS SQL表名子程序包含SQL语句，但不包含读写数据的语句，该值是默认值
+    
+    - NO SQL表名子程序不包含SQL语句
+    
+    - READS SQL DATA说明子程序包含读数据的语句
+    
+    - MODIFIES SQL DATA表名子程序包含写数据的语句
+  
+  - SQL SECURITY {DEFINER | INVOKER}指明谁有权限来执行
+    
+    - DEFINER表示只有定义者才能执行，该值为默认值
+    
+    - INVOKER表示拥有权限的调用者可以执行
+  
+  - COMMENT 'string'注释信息
+
+- 存储过程的SQL代码体，是SQL代码内容，可以用BEGIN...END来表示SQL代码的开始和结束
+
+
+
+创建存储函数基本格式如下：
+
+```sql
+create function 函数名
+（[存储函数参数列表]）
+returns 返回的数据类型
+[存储函数特性]
+存储函数
+```
+
+各部分说明如下：
+
+- 存储函数参数列表，形式如下：`[IN | OUT | INOUT] 参数名 参数类型`
+  
+  - IN表示输入参数
+  
+  - OUT表示输出参数
+  
+  - INOUT表示既可以输入也可以输出
+  
+  - 参数类型可以是MySQL数据库中的任意类型
+
+- 返回的数据类型表示函数返回数据的类型
+
+- 存储函数特性，取值如下：
+  
+  - LANGUAGE SQL说明存储函数代码体是由SQL语句组成的
+  
+  - [NOT] DETERMINISTIC指明存储函数执行的结果是否正确
+    
+    - DETERMINISTIC表示结果是确定的
+    
+    - NOT DETERMINISTIC表示结果是不确定的，该值是默认值
+  
+  - {CONTAINS SQL | NO SQL | READS SQL DATA | MODIFIES SQL DATA}指明子程序使用SQL语句的限制
+    
+    - CONTAINS SQL表名子程序包含SQL语句，但不包含读写数据的语句，该值是默认值
+    
+    - NO SQL表名子程序不包含SQL语句
+    
+    - READS SQL DATA说明子程序包含读数据的语句
+    
+    - MODIFIES SQL DATA表名子程序包含写数据的语句
+  
+  - SQL SECURITY {DEFINER | INVOKER}指明谁有权限来执行
+    
+    - DEFINER表示只有定义者才能执行，该值为默认值
+    
+    - INVOKER表示拥有权限的调用者可以执行
+  
+  - COMMENT 'string'注释信息
+
+- 存储过程的SQL代码体
+
+
+
+- 定义变量： `declare 变量名 [, 变量名] ... 变量类型 [default 默认值];`
+
+- 为变量赋值： `set 变量名 = 表达式 [, 变量名 = 表达式] ...;`
+
+- 为变量赋值： `select 列名 [, ...] into 变量名 [, ...] 查询条件表达式`
+
+- 定义条件： `DECLARE 条件名 CONDITION FOR SQLSTATE [VALUE] sqlstate_value`或 `DECLARE 条件名 CONDITION FOR mysql_error_code}`
+  
+  - sqlstate_value表示长度为5的字符串类型错误代码
+  
+  - mysql_error_codeb表示为数值类型的错误代码
