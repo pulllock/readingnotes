@@ -579,55 +579,73 @@ select 列, ... from 表2
 
 # explain语句
 
+- explain语句基本语法：`EXPLAIN [EXTENED] select查询语句`
+  
+  - EXTENED关键字会产生附加信息
+
+
+
 explain输出结果字段解释如下：
 
-- id 表示编号，标识select所属行
+- id：表示编号，标识select所属行
 
-- select_type表示所使用的select查询类型，取值有如下：
+- select_type：表示所使用的select查询类型，取值有如下：
   
-  - simple表示简单查询，不包括子查询和UNION
+  - simple：表示简单查询，不包括子查询和UNION查询
   
-  - primary如果查询有任何复杂的子部分，则最外层部分标记为primary
+  - primary：表示主查询，如果有复杂的子部分，则表示是最外层的查询
   
-  - union在union中的第二个和随后的select被标记为union
+  - union：在连接查询中的第二个或后面的查询语句
   
-  - union result用来从union的匿名临时表检索结果的select
+  - dependent union：表示连接查询中的第二个或者后面的SELECT语句，取决于外面的查询
   
-  - subquery包含在select列表中的子查询中的select
+  - union result：连接查询的结果
   
-  - derived用来表示包含在from子句的子查询中的select
+  - subquery：子查询中的第一个select语句
+  
+  - dependent subquery：子查询中的第一个select，取决于外面的查询
+  
+  - derived：用来表示包含在from子句的子查询中的select
 
-- table表示对应行正在访问哪个表
+- table：表示查询的表
 
-- type，取值有如下（这些取值从上到下是最优到最差：
+- type：表示表的连接类型，取值有如下（这些取值从上到下是最优到最差）：
   
-  - system
+  - system：该表是仅有一行的系统表，是const连接类型的一个特例
   
-  - const
+  - const：数据表最多只有一个匹配行，将在查询开始时被读取，并在余下的查询优化中作为常量对待。
   
-  - eq_ref索引查找，最多只返回一条符合条件的记录
+  - eq_ref：索引查找，最多只返回一条符合条件的记录
   
-  - ref索引访问（索引查找）
+  - ref：索引访问（索引查找）
   
-  - range范围扫描
+  - ref_or_null： 和ref一样，但是添加了客可以专门搜索包含NULL值的行
   
-  - index跟全表扫描一样，只是扫描表时按照索引次序进行，而不是按照行进行扫描。主要优点是避免了排序。
+  - index_merge： 表示使用了索引合并优化方法
   
-  - ALL全表扫描
+  - unique_subquery：是一个索引查找函数，可以完全替换子查询，效率更高
+  
+  - index_subquery：类似unique_subquery
+  
+  - range：范围扫描
+  
+  - index：跟全表扫描一样，只是扫描表时按照索引次序进行，而不是按照行进行扫描。主要优点是避免了排序。
+  
+  - ALL：全表扫描
 
-- possible_keys显示了查询可以使用哪些索引
+- possible_keys：显示了查询可以使用哪些索引
 
-- key显示了MySQL决定采用哪个索引来优化对该表的访问
+- key：表示查询实际使用到的索引
 
-- key_len显示了MySQL在索引里使用的字节数
+- key_len：显示了MySQL在索引里使用的字节数
 
-- ref显示了之前的表在key列记录的索引中查找值所用的列或常量
+- ref：显示了之前的表在key列记录的索引中查找值所用的列或常量
 
-- rows是估计为了找到所需行而要读取的行数
+- rows：是估计为了找到所需行而要读取的行数
 
-- filtered显示的是针对表里符合某个条件的记录数的百分比所做的一个悲观估算
+- filtered：显示的是针对表里符合某个条件的记录数的百分比所做的一个悲观估算
 
-- Extra显示额外信息，常见值如下：
+- Extra：显示额外信息，常见值如下：
   
   - Using index表示将使用覆盖索引，避免访问表
   
