@@ -641,6 +641,8 @@ explain输出结果字段解释如下：
 
 # 存储过程和函数
 
+## 创建存储过程
+
 创建存储过程基本语法：
 
 ```sql
@@ -692,7 +694,7 @@ create procedure 存储过程名称
 
 - 存储过程的SQL代码体，是SQL代码内容，可以用BEGIN...END来表示SQL代码的开始和结束
 
-
+## 创建存储函数
 
 创建存储函数基本格式如下：
 
@@ -761,3 +763,374 @@ returns 返回的数据类型
   - sqlstate_value表示长度为5的字符串类型错误代码
   
   - mysql_error_codeb表示为数值类型的错误代码
+
+- 定义处理程序： `DECLARE handler_type HANDLER FOR condition_value [,...] sp_statement`
+  
+  - handler_type为错误处理方式，取值如下：
+    
+    - CONTINUE表示遇到错误不处理
+    
+    - EXIT表示遇到错误马上突出
+    
+    - UNDO表示遇到错误后撤回之前的操作
+  
+  - condition_value表示错误类型，取值如下：
+    
+    - SQLSTATE [VALUE] sqlstate_value包含5个字符的字符串错误值
+    
+    - condition_name表示使用DECALRE CONDITION定义的错误条件名称
+    
+    - SQLWARNING匹配所有以01开头的SQLSTATE错误代码
+    
+    - NOT FOUND匹配所有以02开头的SQLSTATE错误代码
+    
+    - SQLEXCEPTION匹配所有其他的SQLSTATE错误代码
+    
+    - MySQL_error_code匹配数值类型错误代码
+  
+  - sp_statement是程序语句段，表示在遇到定义的错误时需要执行的存储过程或函数
+
+- 调用存储过程： `call 存储过程名字([参数[, ...])`
+
+- 调用存储函数：和MySQL内部函数使用方法一样
+
+- 声明光标：`DECLARE 光标名称 CURSOR FOR select语句内容`
+
+- 打开光标：`OPEN 光标名称`
+
+- 使用光标： `FETCH 光标名称 INTO 变量名 [, 变量名] ...`
+
+- 关闭光标： `CLOSE 光标名称`
+
+- 查看存储过程和函数的状态： `SHOW {PROCEDURE | FUNCTION} STATUS [LIKE 'pattern'] [\G]` LIKE语句表示匹配存储过程或函数的名称
+
+- 查看存储过程和函数的定义： `SHOW CREATE {PROCEDURE | FUNCTION} 存储过程或函数名称 [\G]`
+
+- 查看存储过程和函数的定义，在information_schema数据库的routines表中
+
+- 修改存储过程和函数：`ALTER {PROCEDURE | FUNCTION} 存储过程或函数名称 [存储函数的特性]`，其中存储函数特性可能的取值有：
+  
+  - CONSTAINS SQL表示子程序包含SQL语句但不包含读写数据的语句
+  
+  - NO SQL表示子程序中不包含SQL语句
+  
+  - READS SQL DATA表示子程序中包含读数据的语句
+  
+  - MODIFIES SQL DATA表示子程序中包含写数据的语句
+  
+  - SQL SECURITY {DEFINER | INVOKER}指明谁有全线来执行
+    
+    - DEFINER表示只有定义着自己能够执行
+    
+    - INVOKER表示调用者可执行
+  
+  - COMMENT 'string'注释信息
+
+- 删除存储过程和函数： `DROP {PROCEDURE | FUNCTION} [IF EXISTS] 存储过程或函数名称`
+
+## 流程控制
+
+- IF语句：
+
+```sql
+IF 条件表达式 
+    THEN 执行语句
+    [ELSEIF 条件表达式 THEN 执行语句] ...
+    [ELSE 执行语句]
+END IF
+```
+
+- CASE语句：
+
+```sql
+CASE 条件表达式
+    WHEN 表达式可能的值 THEN 执行语句
+    [WHEN 表达式可能的值 THEN 执行语句] ...
+    [ELSE 执行语句]
+END CASE
+```
+
+```sql
+CASE
+    WHEN 条件表达式 THEN 执行语句
+    [WHEN 条件表达式 THEN 执行语句] ...
+    [ELSE 执行语句]
+END CASE
+```
+
+- LOOP语句：
+
+```sql
+loop语句名称: LOOP
+    需要循环执行的语句
+END LOOP loop语句名称
+```
+
+- LEAVE语句： `LEAVE 循环标志` 用来退出被标注的流程控制
+
+- ITERATE语句： `ITERATE 循环标志` 只能出现在LOOP、REPEAT、WHILE语句内，表示再次循环
+
+- REPEAT语句：
+
+```sql
+repeat语句名称: REPEAT
+    执行的语句
+UNTIL 条件表达式
+END REPEAT repeat语句名称
+```
+
+- WHILE语句：
+
+```sql
+while语句名称: WHILE 条件表达式 DO
+    执行的语句
+END WHILE while语句名称
+```
+
+# 全局变量
+
+- 设置全局变量： `SET GLOBAL 全局变量名称=值`
+
+- 设置持久化的全局变量： `SET PERSIST 全局变量名称=值`
+
+# 视图
+
+- 创建视图：
+
+```sql
+CREATE [OR REPLACE] [ALGORITHM = {UNDEFINED | MERGE | TEMPTABLE}]
+VIEW 视图名 [(属性列)]
+AS select语句
+[WITH [CASCADED | LOCAL] CHECK OPTION]
+```
+
+- 创建视图各参数说明如下：
+  
+  - ALGORITHM表示视图选择算法，有三个值：
+    
+    - UNDEFINED表示MySQL将自动选择算法
+    
+    - MERGE表示将使用的视图语句与视图定义合并起来，使得视图定义的某一部分取代语句相应的部分
+    
+    - TEMPTABLE表示将视图的结果存入临时表，用临时表来执行语句
+  
+  - `WITH [CASCADED | LOCAL] CHECK OPTION`表示视图在更新时保证在视图的权限范围之内
+    
+    - CASCADED是默认值，表示更新视图时要满足所有相关表和表的条件
+    
+    - LOCAL表示更新视图时满足该视图本身定义的条件即可
+
+- 查看视图基本信息： `DESCRIBE 视图名;` 或 `SHOW TABLE STATUS LIKE '视图名';`
+
+- 查看视图详细信息： `SHOW CREATE VIEW 视图名;`
+
+- 查看视图详细信息，在information_schema数据库的views表中
+
+- 修改视图：
+
+```sql
+CREATE OR REPLACE [ALGORITHM = {UNDEFINED | MERGE | TEMPTABLE}]
+VIEW 视图名 [(属性列)]
+AS select语句
+[WITH [CASCADED | LOCAL] CHECK OPTION]
+```
+
+- 修改视图：
+
+```sql
+ALTER [ALGORITHM = {UNDEFINED | MERGE | TEMPTABLE}]
+VIEW 视图名 [(属性列)]
+AS select语句
+[WITH [CASCADED | LOCAL] CHECK OPTION]
+```
+
+- 删除视图： `DROP VIEW [IF EXISTS] 视图名 [, 视图名] ... [RESTRICT | CASCADE]`
+
+# 触发器
+
+- 创建触发器： `CREATE TRIGGER 触发器名称 触发时机 触发事件 ON 表名 FOR EACH ROW 触发器执行语句`
+  
+  - 触发时机有：before、after
+  
+  - 触发事件有：INSERT、UPDATE、DELETE
+
+- 创建有多个执行语句的触发器：
+
+```sql
+CREATE TRIGGER 触发器名称 触发时机 触发事件 ON 表名 FOR EACH ROW 
+BEGIN
+    触发器执行语句列表
+END
+```
+
+- 查看触发器： `SHOW TRIGGERS \G;`
+
+- 查看触发器，在information_schema数据库的triggers表中
+
+- 删除触发器： `DROP TRIGGER 触发器名称;`
+
+# 权限和安全
+
+- 权限表
+  
+  - user表记录允许连接到服务器的账号信息
+  
+  - db表存储了用户对某个数据库的操作权限，决定用户能从哪个主机存取哪个数据库
+  
+  - table_priv表用来对表设置操作权限
+  
+  - columns_priv表用来对表的某一列设置权限
+  
+  - procs_priv表可以对存储过程和存储函数设置操作权限
+
+- 登录mysql： `mysql -h 主机名 -u 用户名 -p 密码 -P 端口号 数据库名 -e 要执行的SQL语句或命令`
+
+- 新建普通用户： `CREATE USER '用户名'@'主机名' IDENTIFIED BY [PASSWORD] '密码'` 或 `CREATE USER '用户名'@'主机名' IDENTITIED WITH 插件名称 [AS '插件参数']`
+
+- 删除普通用户： `DROP USER '用户名'@'主机名' [, '用户名'@'主机名', ...]`
+
+- 修改root用户密码： `update mysql.user set authentication_string = MD5("密码") where user='root' and host='localhost';` 修改后执行`flush privileges`重新加载用户权限
+
+- 修改普通用户密码： `SET PASSWORD FOR '用户名'@'主机名'='密码';`
+
+- 授权的层级：
+  
+  - 全局层级，适用于服务器中的所有数据库。`GRANT ALL ON *.*`授予全局权限；`REVOKE ALL ON *.*`撤销全局权限
+  
+  - 数据库层级，适用于指定数据库。`GRANT ALL ON 数据库名.*`授予数据库权限；`REVOKE ALL ON 数据库名.*`撤销数据库权限
+  
+  - 表层级，适用于指定表中的所有列。`GRANT ALL ON 数据库名.表名`授予表权限；`REVOKE ALL ON 数据库名.表名`撤销表权限
+  
+  - 列层级，适用于指定表中的单一列。
+  
+  - 子程序层级
+
+- GRANT语法：`GRANT 权限类型 [(具体列)] [, 权限类型 [(具体列)] ... ON [TABLE | FUNCTION | PROCEDURE] 表1, 表2, ..., 表n TO '用户名'@'主机名' IDENTIFIED BY '密码' [WITH GRANT OPTION]`
+  
+  - WITH后面的GRANT OPTION表示被授权的用户可以将这些权限赋予别的用户
+
+- 收回所有用户的所有权限：`REVOKE ALL PRIVILEGES, GRANT OPTION FROM '用户名'@'主机名' [, '用户名'@'主机名', ...]`
+
+- 收回指定权限： `REVOKE 权限类型 [(具体列)] [, 权限类型 [(具体列)] ... ON 表1, 表2, ..., 表n FROM '用户名'@'主机名' [, '用户名'@'主机名', ...]`
+
+- 查看权限： `SHOW GTANTS FOR '用户名'@'主机名';`
+
+- 创建角色： `CREATE ROLE 角色名`
+
+- 给角色授予权限： `GRANT SELECT ON db.* TO '角色名'`
+
+- 删除角色权限：`REVOKE SELECT ON db.* FROM '角色名'`
+
+- 给用户赋予角色： `GRANT '角色名' TO '用户名'@'主机名'`
+
+- 删除角色： `DROP ROLE 角色名`
+
+# 备份和恢复
+
+- mysqldump命令备份： `mysqldump -u 用户名 -h 主机名 -p密码 数据库名 [表名, [表名, ...]] > 备份文件名.sql`
+
+- mysqldump备份多个数据库： `mysqldump -u 用户名 -h 主机名 -p密码 --databases [数据库名 [, 数据库名, ...]] > 备份文件名.sql`
+
+- 恢复： `mysql -u 用户名 -h 主机名 -p密码 [数据库名] < 备份文件名.sql`
+
+- 已登录服务器时可以使用source命令导入sql文件： `source 文件名`
+
+- 迁移： `mysqldump -u 用户名 -h 源主机名 -p密码 数据库名 | mysql -u 用户名 -h 目标主机名 -p密码 `
+
+- 在服务器上导出文本文件： `SELECT 列 FROM 表 WHERE 条件 INTO OUTFILE '文件名' [选项]`，其中选项有如下取值：
+  
+  - FIELDS TERMINATED BY '分隔符'：设置字段间的分隔符，默认情况下为制表符`\t`
+  
+  - FIELDS [OPTIONALLY] ENCLOSED BY '包围字符'：设置字段的包围字符
+  
+  - FIELDS ESCAPED BY '转义字符'：设置转义字符，默认值为`\`
+  
+  - LINES STARTING BY '每行数据开头字符'：设置每行数据开头的字符
+  
+  - LINES TERMINATED BY '每行数据结尾字符'：设置每行数据结尾的字符，默认为`\n`
+
+- 在客户主机导出文件： `mysql -u 用户名 -p密码 -e "select ..." 数据库名 > 文件名` 或`mysql -u 用户名 -p密码 --execute= "select ..." 数据库名 > 文件名`，其他参数：
+  
+  - `--vertical` 显示结果
+  
+  - `--html` 将查询结果导出到html文件中： `mysql -u 用户名 -p密码 --html --execute= "select ..." 数据库名 > 文件名.html`
+  
+  - `--xml` 将查询结果导出到xml文件中： `mysql -u 用户名 -p密码 --xml --execute= "select ..." 数据库名 > 文件名.xml`
+
+- mysqldump导出文本文件： `mysqldump -T 导出数据的目录 -u 用户名 -p密码 数据库名 [表] [选项]`，其中选项取值如下：
+  
+  - `--fields-terminated-by=分隔符`：设置字段间的分隔符，默认情况下为制表符`\t`
+  
+  - `--fields-enclosed-by=包围字符`：设置字段的包围字符
+  
+  - `--fields-optionally-enclosed-by=包围字符`：设置字段的包围字符，只能为单个字符，只能包括CHAR和VARCHAR等字符数据字段
+  
+  - `--fields-escaped-by=转移字符`：设置转义字符，默认值为`\`
+  
+  - `--lines-terminated-by=每行数据结尾字符`：设置每行数据结尾的字符，默认为`\n`
+
+- 在服务器导入文本文件： `LOAD DATA INFILE '文件名' INTO TABLE 表名 [选项] [IGNORE number LINES]`
+  
+  - 选项取值有：
+    
+    - FIELDS TERMINATED BY '分隔符'：设置字段间的分隔符，默认情况下为制表符`\t`
+    
+    - FIELDS [OPTIONALLY] ENCLOSED BY '包围字符'：设置字段的包围字符
+    
+    - FIELDS ESCAPED BY '转义字符'：设置转义字符，默认值为`\`
+    
+    - LINES STARTING BY '每行数据开头字符'：设置每行数据开头的字符
+    
+    - LINES TERMINATED BY '每行数据结尾字符'：设置每行数据结尾的字符，默认为`\n`
+  
+  - `[IGNORE number LINES]`表示忽略文件开始处的行数
+
+- 在客户主机导入文本文件： `mysqlimport -u 用户名 -p密码 数据库名 文件名 [选项]`，选项取值如下：
+  
+  - `--fields-terminated-by=分隔符`：设置字段间的分隔符，默认情况下为制表符`\t`
+  
+  - `--fields-enclosed-by=包围字符`：设置字段的包围字符
+  
+  - `--fields-optionally-enclosed-by=包围字符`：设置字段的包围字符，只能为单个字符，只能包括CHAR和VARCHAR等字符数据字段
+  
+  - `--fields-escaped-by=转移字符`：设置转义字符，默认值为`\`
+  
+  - `--lines-terminated-by=每行数据结尾字符`：设置每行数据结尾的字符，默认为`\n`
+  
+  - `--ignore-lines=n`：忽略数据文件的前n行
+
+- mysqlimport其他选项
+  
+  - `--columns=column_list` 或 `-c column_list`：逗号分割，指定列名
+  
+  - `--compress`或`-C`：压缩在客户端和服务器短之间发送的信息
+  
+  - `--delete`或`-d`：导入文本文件前清空表
+  
+  - `--force`或`-f`：忽略错误
+  
+  - `--host=主机名`或`-h 主机名`：将数据导入给定的主机
+  
+  - `--ignore`或`-i`
+  
+  - `--replace`或`-r`： 该选项和`--ignore`选项控制复制唯一键值已存在的情况，如果指定了`--replace`则新的数据会替换已有的；如果指定`--ignore`则新的会被跳过；如果两个选项都不指定，则报错
+  
+  - `--ignore-lines=n`：忽略数据文件前n行
+  
+  - `--local`或`-L`：从本地客户端读取文件
+  
+  - `--lock-tables`或`-l`：处理文本文件前锁定所有表
+  
+  - `--password[=密码]`或`-p[密码]`：连接服务器的密码
+  
+  - `--port=端口号`或`-P 端口号`：连接的端口号
+  
+  - `--protocol={TCP | SOCKET | PIPE | MEMROY}`：使用的连接协议
+  
+  - `--slient`或`-s`：沉默模式，只有出现错误时才会输出信息
+  
+  - `--user=用户名`或`-u 用户名`：连接服务器的用户名
+  
+  - `--verbose`或`-v`：打印详细信息
+  
+  - `--version`或`-V`：版本信息
