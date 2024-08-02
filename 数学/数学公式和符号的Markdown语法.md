@@ -281,6 +281,8 @@ y=\begin{cases} -x, \quad x \leq 0 \\ x, \quad x>0 \end{cases}
 | $\wedge$     | `\wedge`     | 逻辑或 |
 | $\bigvee$    | `\bigvee`    | 逻辑与 |
 | $\bigwedge$  | `\bigwedge`  | 逻辑或 |
+| $\lnot$      | `\lnot`      | 逻辑非 |
+| $\neg$       | `\neg`       | 逻辑非 |
 
 # 希腊字母
 
