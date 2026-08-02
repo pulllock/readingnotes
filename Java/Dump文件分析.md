@@ -1,0 +1,25 @@
+# IntelliJ IDEA Profiler
+
+- Classes（类列表试图）：将堆中所有的对象按所属类进行归类和统计
+	- Class：类全限定名
+	- Count：该类当前在堆中的实例总数
+	- Shallow：对象自身占用的内存大小。仅包括对象头、实例变量引用的指针大小，不包括它所引用的实际对象内容。
+	- Retained：保留大小/保持内存。表示如果当前类的所有实例被垃圾回收，能释放出的堆内存的总量。
+- Biggest Objects：从大到小的顺序排列对象
+	- Item
+	- Shallow
+	- Retained
+- GC Roots：垃圾回收根节点视图
+	- Item
+	- Shallow
+	- Retained
+- Merged Paths：合并路径视图，点击某个类时，会将这个类关连的对象列出
+- Summary：整个快照的概要
+	- Total Bytes: 堆内存中所有存活对象占用的总内存大小
+	- Total Classes: 已加载类数量
+	- Total Instances: 对象实例总数量
+	- Classloaders: 类加载器数量
+	- GC Roots: 垃圾回收根节点数量
+	- 快照生成那一刻所有活跃线程的堆栈信息
+- Packages：包路径视图，按照包路径分类
+- Duplicated Strings：重复字符串分析
